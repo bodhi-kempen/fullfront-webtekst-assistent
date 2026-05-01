@@ -24,6 +24,9 @@ yarn-error.log*
 *.swp
 *.swo
 
+# Claude Code local state
+.claude/
+
 # misc
 coverage/
 .cache/
