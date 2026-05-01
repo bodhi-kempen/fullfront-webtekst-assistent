@@ -16,10 +16,63 @@ export const anthropic = new Anthropic({
 
 export const ANTHROPIC_MODEL = env.anthropicModel;
 
+// HTTP statuses worth retrying on. 429 = rate limit, 5xx = transient server.
+// 529 = Anthropic-specific "overloaded" status some endpoints surface.
+const TRANSIENT_HTTP_STATUSES = new Set([429, 500, 502, 503, 504, 529]);
+
+const MAX_RETRIES = 3; // → 4 total attempts
+const BASE_BACKOFF_MS = 1000; // attempt N waits BASE * 2^(N-1) plus jitter
+
+interface AnthropicErrorShape {
+  status?: number;
+  // SDK exposes the parsed body on APIError instances. We sniff its shape
+  // defensively because the type isn't always available at compile time.
+  error?: { error?: { type?: string } } | { type?: string };
+  message?: string;
+  name?: string;
+}
+
+function transientReason(err: unknown): string | null {
+  if (!err || typeof err !== 'object') return null;
+  const e = err as AnthropicErrorShape;
+
+  if (typeof e.status === 'number' && TRANSIENT_HTTP_STATUSES.has(e.status)) {
+    return `http_${e.status}`;
+  }
+
+  // Anthropic API errors put the type at error.error.type or error.type.
+  // overloaded_error and api_error are both worth retrying.
+  const inner = e.error as { error?: { type?: string }; type?: string } | undefined;
+  const apiType = inner?.error?.type ?? inner?.type;
+  if (apiType === 'overloaded_error' || apiType === 'api_error') {
+    return `api_${apiType}`;
+  }
+
+  // Network-level: undici/node-fetch fail with a name like "FetchError" and
+  // codes such as ECONNRESET / ETIMEDOUT / EAI_AGAIN. Retry those too.
+  const code = (err as { code?: string }).code;
+  if (
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'EAI_AGAIN' ||
+    code === 'UND_ERR_SOCKET'
+  ) {
+    return `net_${code}`;
+  }
+
+  return null;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
  * Run a tool-use call where Claude is forced to call exactly one tool, and
  * return the parsed input. Errors out if Claude refuses or returns text
  * instead of a tool call. System prompt is sent with prompt caching enabled.
+ *
+ * Transient errors (429/5xx, overloaded_error, network resets) are retried up
+ * to 3 times with exponential backoff + jitter. Non-transient errors throw
+ * immediately so callers can surface them.
  */
 export async function callTool<T>(opts: {
   systemPrompt: string;
@@ -42,14 +95,39 @@ export async function callTool<T>(opts: {
     },
   ];
 
-  const response = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
-    max_tokens: opts.maxTokens ?? 1024,
-    system: systemBlocks,
-    tools: [opts.tool],
-    tool_choice: { type: 'tool', name: opts.tool.name },
-    messages: opts.messages,
-  });
+  let response: Anthropic.Message | undefined;
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      response = await anthropic.messages.create({
+        model: ANTHROPIC_MODEL,
+        max_tokens: opts.maxTokens ?? 1024,
+        system: systemBlocks,
+        tools: [opts.tool],
+        tool_choice: { type: 'tool', name: opts.tool.name },
+        messages: opts.messages,
+      });
+      break;
+    } catch (err) {
+      lastError = err;
+      const reason = transientReason(err);
+      if (!reason || attempt === MAX_RETRIES) {
+        throw err;
+      }
+      const backoff =
+        BASE_BACKOFF_MS * 2 ** attempt + Math.floor(Math.random() * 250);
+      console.warn(
+        `[anthropic] ${opts.purpose} transient ${reason}, retrying in ${backoff}ms (attempt ${attempt + 1}/${MAX_RETRIES})`
+      );
+      await sleep(backoff);
+    }
+  }
+
+  if (!response) {
+    // Defensive: should be unreachable because the loop either breaks with a
+    // response or throws lastError above.
+    throw lastError ?? new Error('callTool: exhausted retries with no response');
+  }
 
   // Log usage even if the response shape is wrong — we still consumed tokens.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
