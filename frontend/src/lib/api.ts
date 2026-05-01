@@ -71,9 +71,22 @@ async function authedFetch(path: string, init: RequestInit): Promise<Response> {
   return res;
 }
 
+export class BudgetExceededError extends Error {
+  code = 'budget_exceeded' as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'BudgetExceededError';
+  }
+}
+
 async function throwIfBad(res: Response): Promise<void> {
   if (res.ok) return;
   const body = await res.json().catch(() => ({}));
+  if (res.status === 402 && body.code === 'budget_exceeded') {
+    throw new BudgetExceededError(
+      body.error ?? 'Je hebt je gebruikslimiet bereikt.'
+    );
+  }
   throw new Error(body.error ?? `Request failed: ${res.status}`);
 }
 

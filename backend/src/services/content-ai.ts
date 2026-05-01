@@ -204,6 +204,7 @@ ${ans(ctx, 'p5q5', 'p7q1')}
     messages: [{ role: 'user', content: user }],
     tool: HERO_TOOL,
     maxTokens: 512,
+    purpose: 'content/hero',
   });
 }
 
@@ -268,6 +269,7 @@ ${ans(ctx, 'p6q5', 'p6q6', 'p7q5')}
     messages: [{ role: 'user', content: user }],
     tool: OVER_SHORT_TOOL,
     maxTokens: 768,
+    purpose: 'content/over-short',
   });
 }
 
@@ -344,6 +346,7 @@ ${ans(ctx, 'p6q5', 'p6q6', 'p7q5', 'p7q6')}
     messages: [{ role: 'user', content: user }],
     tool: OVER_FULL_TOOL,
     maxTokens: 1536,
+    purpose: 'content/over-full',
   });
 }
 
@@ -466,6 +469,7 @@ ${ans(ctx, 'p5q5')}
     messages: [{ role: 'user', content: user }],
     tool: SERVICES_TOOL,
     maxTokens: 2048,
+    purpose: 'content/services',
   });
 }
 
@@ -591,6 +595,7 @@ ${ans(ctx, 'p1q4', 'p1q5')}
     messages: [{ role: 'user', content: user }],
     tool: TESTIMONIALS_TOOL,
     maxTokens: 2048,
+    purpose: 'content/testimonials',
   });
 }
 
@@ -659,6 +664,7 @@ ${ans(ctx, 'p7q1', 'p5q5')}
     messages: [{ role: 'user', content: user }],
     tool: OPTIN_TOOL,
     maxTokens: 384,
+    purpose: 'content/optin',
   });
 }
 
@@ -708,6 +714,7 @@ ${ans(ctx, 'p1q1', 'p1q3', 'p1q4')}
     messages: [{ role: 'user', content: user }],
     tool: FOOTER_TOOL,
     maxTokens: 256,
+    purpose: 'content/footer',
   });
 }
 
@@ -812,6 +819,7 @@ ${ans(ctx, 'p10q6', 'p10q7')}
     messages: [{ role: 'user', content: user }],
     tool: CONTACT_TOOL,
     maxTokens: 1024,
+    purpose: 'content/contact',
   });
 }
 
@@ -869,6 +877,7 @@ ${ans(ctx, 'p9q1', 'p9q2', 'p9q3', 'p9q5')}
     messages: [{ role: 'user', content: user }],
     tool: BLOG_TOOL,
     maxTokens: 512,
+    purpose: 'content/blog',
   });
 }
 
@@ -974,5 +983,6 @@ ${servicesBlock(ctx)}
     messages: [{ role: 'user', content: user }],
     tool: FAQ_TOOL,
     maxTokens: 2048,
+    purpose: 'content/faq',
   });
 }

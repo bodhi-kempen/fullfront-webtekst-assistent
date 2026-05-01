@@ -129,6 +129,7 @@ is op null — niet op "<UNKNOWN>" of een andere placeholder.
     messages: [{ role: 'user', content: userMessage }],
     tool: EXTRACT_TOOL,
     maxTokens: 1024,
+    purpose: 'content/business-info',
   });
 
   // Always ensure privacy is in the legal list.

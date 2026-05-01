@@ -51,4 +51,7 @@ export const env = {
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
   anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6',
+  // Per-user lifetime spend cap on Claude (USD). Set to 0 to disable.
+  // Default $3 ≈ €2,80 — enough for ~3 complete projects at current usage.
+  maxUsageUsdPerUser: Number(process.env.MAX_USAGE_USD_PER_USER ?? 3),
 };

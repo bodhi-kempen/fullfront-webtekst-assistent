@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { env } from '../config/env.js';
+import { assertWithinBudget, logUsage } from './usage.js';
 
 if (!env.anthropicApiKey) {
   // Allow the server to start without the key so other routes still work,
@@ -25,7 +26,11 @@ export async function callTool<T>(opts: {
   messages: Anthropic.MessageParam[];
   tool: Anthropic.Tool;
   maxTokens?: number;
+  /** Free-form label for usage telemetry, e.g. "interview/turn" or "content/hero". */
+  purpose: string;
 }): Promise<T> {
+  await assertWithinBudget();
+
   // cache_control on text blocks is accepted at runtime (prompt caching is GA)
   // but the TextBlockParam type in this SDK version doesn't expose it yet.
   const systemBlocks: Anthropic.TextBlockParam[] = [
@@ -45,6 +50,20 @@ export async function callTool<T>(opts: {
     tool_choice: { type: 'tool', name: opts.tool.name },
     messages: opts.messages,
   });
+
+  // Log usage even if the response shape is wrong — we still consumed tokens.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const usage = (response.usage ?? {}) as any;
+  logUsage({
+    purpose: opts.purpose,
+    model: ANTHROPIC_MODEL,
+    tokens: {
+      input: usage.input_tokens ?? 0,
+      output: usage.output_tokens ?? 0,
+      cache_creation: usage.cache_creation_input_tokens ?? 0,
+      cache_read: usage.cache_read_input_tokens ?? 0,
+    },
+  }).catch(() => undefined);
 
   const toolUse = response.content.find(
     (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'

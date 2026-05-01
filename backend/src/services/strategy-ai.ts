@@ -312,6 +312,7 @@ Bepaal nu de strategie via de propose-tool.
     messages: [{ role: 'user', content: userMessage }],
     tool: PROPOSE_TOOL,
     maxTokens: 1024,
+    purpose: 'strategy/propose',
   });
 
   const suggested_pages = buildPagesList(archetype, decision);

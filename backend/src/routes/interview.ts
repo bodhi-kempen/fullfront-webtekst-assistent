@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { setProjectInContext } from '../lib/usage.js';
 import {
   getInterviewStep,
   markInterviewComplete,
@@ -36,6 +37,7 @@ interviewRouter.post('/start', async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
     await assertProjectOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     const step = await getInterviewStep(projectId);
     res.json(step);
   } catch (err) {
@@ -48,6 +50,7 @@ interviewRouter.post('/answer', async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
     await assertProjectOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
 
     const body = (req.body ?? {}) as Partial<SubmitAnswerInput>;
     if (!body.question_id || !body.answer_text || !body.answer_source) {
@@ -82,6 +85,7 @@ interviewRouter.get('/status', async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
     await assertProjectOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     const step = await getInterviewStep(projectId);
     res.json(step);
   } catch (err) {
@@ -94,6 +98,7 @@ interviewRouter.post('/complete', async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
     await assertProjectOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     await markInterviewComplete(projectId);
     res.json({ ok: true });
   } catch (err) {

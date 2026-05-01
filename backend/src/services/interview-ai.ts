@@ -175,6 +175,7 @@ Beslis nu via de respond-tool.
     messages: [{ role: 'user', content: userMessage }],
     tool: RESPOND_TOOL,
     maxTokens: 384,
+    purpose: 'interview/turn',
   });
 
   // Belt-and-braces enforcement
@@ -274,6 +275,7 @@ export async function classifyArchetype(
     ],
     tool: CLASSIFY_TOOL,
     maxTokens: 256,
+    purpose: 'interview/archetype',
   });
 }
 
@@ -302,6 +304,7 @@ export async function classifyMoreServices(answer: string): Promise<boolean> {
     messages: [{ role: 'user', content: `Antwoord: "${answer}"` }],
     tool: YES_NO_TOOL,
     maxTokens: 64,
+    purpose: 'interview/yesno-services',
   });
   return result.yes;
 }
@@ -314,6 +317,7 @@ export async function classifyBlogOptin(answer: string): Promise<boolean> {
     messages: [{ role: 'user', content: `Antwoord: "${answer}"` }],
     tool: YES_NO_TOOL,
     maxTokens: 64,
+    purpose: 'interview/yesno-blog',
   });
   return result.yes;
 }

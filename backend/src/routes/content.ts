@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { setProjectInContext } from '../lib/usage.js';
 import {
   getPagesWithContent,
   startContentGeneration,
@@ -32,6 +33,7 @@ contentRouter.post('/generate', async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     startContentGeneration(projectId);
     res.json({ generating: true });
   } catch (err) {
@@ -44,6 +46,7 @@ contentRouter.get('/pages', async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
 
     const { data: project, error } = await supabaseAdmin
       .from('projects')
@@ -64,6 +67,7 @@ contentRouter.get('/pages/:page_id', async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     const pages = await getPagesWithContent(projectId);
     const pageId = (req.params as { page_id: string }).page_id;
     const page = pages.find((p) => p.id === pageId);

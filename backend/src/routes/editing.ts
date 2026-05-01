@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { setProjectInContext } from '../lib/usage.js';
 import {
   assertSectionOwner,
   regenerateSection,
@@ -43,6 +44,7 @@ editingRouter.post('/:id/regenerate', async (req, res, next) => {
   try {
     const sectionId = req.params.id!;
     const owner = await assertSectionOwner(sectionId, req.user!.id);
+    setProjectInContext(owner.projectId);
     await regenerateSection(sectionId, owner.pageType, owner.projectId);
     res.json({ ok: true });
   } catch (err) {
@@ -57,6 +59,7 @@ editingRouter.post('/:id/regenerate-with-prompt', async (req, res, next) => {
   try {
     const sectionId = req.params.id!;
     const owner = await assertSectionOwner(sectionId, req.user!.id);
+    setProjectInContext(owner.projectId);
     const { instruction } = (req.body ?? {}) as { instruction?: string };
     if (typeof instruction !== 'string' || instruction.trim().length === 0) {
       return res.status(400).json({ error: 'instruction (string) is required' });

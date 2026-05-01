@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { supabaseAdmin } from '../lib/supabase.js';
+import { setProjectInContext } from '../lib/usage.js';
 import {
   approveStrategy,
   generateStrategy,
@@ -36,6 +37,7 @@ strategyRouter.post('/generate', async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     const strategy = await generateStrategy(projectId);
     res.json({ strategy });
   } catch (err) {
@@ -48,6 +50,7 @@ strategyRouter.get('/', async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     const strategy = await getStrategy(projectId);
     if (!strategy) return res.status(404).json({ error: 'Strategy not yet generated' });
     res.json({ strategy });
@@ -61,6 +64,7 @@ strategyRouter.put('/', async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     const updates = (req.body ?? {}) as StrategyUpdate;
     const strategy = await updateStrategy(projectId, updates);
     res.json({ strategy });
@@ -74,6 +78,7 @@ strategyRouter.post('/approve', async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertOwner(projectId, req.user!.id);
+    setProjectInContext(projectId);
     const strategy = await approveStrategy(projectId);
     // Kick off content generation in the background. Server returns immediately.
     void startContentGeneration(projectId);
