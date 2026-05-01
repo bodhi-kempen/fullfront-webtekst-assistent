@@ -26,7 +26,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Detect embed mode synchronously, BEFORE any auth/redirect decisions.
+    // isEmbedded() is also persisted to localStorage so client-side route
+    // changes (which drop ?embed=true) keep behaving as embedded.
     const embed = isEmbedded();
+
+    async function ensureAnonymousSession() {
+      // Retry once on transient network failures. If anonymous sign-in is
+      // disabled in Supabase, the second call will fail the same way and
+      // we surface the error — but we still don't flip loading=false here
+      // for embed mode, because flipping would let ProtectedRoute redirect
+      // to /login and lose the embed context.
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (!error && data.session) {
+          console.info('[auth] anonymous sign-in succeeded');
+          return;
+        }
+        console.error(`[auth] anonymous sign-in attempt ${attempt} failed`, error);
+      }
+    }
 
     supabase.auth.getSession().then(async ({ data }) => {
       // Embedded in the Fullfront members area: skip the login screen and
@@ -34,13 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // RLS policies, so projects scope correctly to this anonymous user.
       if (!data.session && embed) {
         console.info('[auth] embed mode — signing in anonymously');
-        const { error } = await supabase.auth.signInAnonymously();
-        if (error) {
-          console.error('[auth] anonymous sign-in failed', error);
-          setLoading(false);
-          return;
-        }
-        // onAuthStateChange (SIGNED_IN) will set the session and flip loading.
+        await ensureAnonymousSession();
+        // onAuthStateChange(SIGNED_IN) will set session and flip loading.
         return;
       }
 
