@@ -1,0 +1,14 @@
+# Pin Node 22 and run the unified build (frontend → backend) in one service.
+# Without this, Nixpacks may detect the workspaces as separate apps.
+
+[phases.setup]
+nixPkgs = ["nodejs_22", "npm-9_x"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
