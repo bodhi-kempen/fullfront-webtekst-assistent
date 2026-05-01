@@ -53,42 +53,116 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     async function ensureAnonymousSession() {
-      // Retry once on transient network failures.
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const { data, error } = await supabase.auth.signInAnonymously();
-          if (!error && data.session) {
-            console.info('[auth] anonymous sign-in succeeded', {
-              userId: data.session.user?.id,
-              isAnonymous: data.session.user?.is_anonymous,
-            });
-            return;
-          }
-          console.error(
-            `[auth] anonymous sign-in attempt ${attempt} failed`,
-            JSON.stringify(
-              {
-                name: error?.name,
-                message: error?.message,
-                status: error?.status,
-                code: (error as { code?: string } | null)?.code,
-              },
-              null,
-              2
-            )
-          );
-        } catch (e) {
-          // Network-level errors throw rather than returning { error }.
-          console.error(
-            `[auth] anonymous sign-in attempt ${attempt} threw`,
-            e instanceof Error ? `${e.name}: ${e.message}` : String(e)
-          );
+      // Step 1 — try the native anonymous sign-in. This is the cheap,
+      // documented path: signInAnonymously() POSTs to /auth/v1/signup with
+      // {is_anonymous: true} and returns a session.
+      try {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (!error && data.session) {
+          console.info('[auth] anonymous sign-in succeeded (native)', {
+            userId: data.session.user?.id,
+            isAnonymous: data.session.user?.is_anonymous,
+          });
+          return;
         }
+        console.warn(
+          '[auth] native signInAnonymously failed, falling back to email/password',
+          JSON.stringify(
+            {
+              name: error?.name,
+              message: error?.message,
+              status: error?.status,
+              code: (error as { code?: string } | null)?.code,
+            },
+            null,
+            2
+          )
+        );
+      } catch (e) {
+        console.warn(
+          '[auth] native signInAnonymously threw, falling back to email/password',
+          e instanceof Error ? `${e.name}: ${e.message}` : String(e)
+        );
       }
-      // Both attempts failed — let the timeout handler surface the UI error.
-      setAuthError(
-        'Anonieme login mislukt na 2 pogingen. Check de browser console voor details.'
-      );
+
+      // Step 2 — fallback. Generate (or reuse) an email/password and create
+      // a regular user. Credentials are stored in localStorage so the same
+      // browser keeps the same identity across iframe reloads, which means
+      // projects persist between visits.
+      const EMAIL_KEY = 'fullfront.anonEmail';
+      const PASS_KEY = 'fullfront.anonPass';
+
+      const storedEmail = window.localStorage.getItem(EMAIL_KEY);
+      const storedPass = window.localStorage.getItem(PASS_KEY);
+
+      if (storedEmail && storedPass) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: storedEmail,
+          password: storedPass,
+        });
+        if (!error && data.session) {
+          console.info('[auth] email-fallback sign-in succeeded (returning visitor)', {
+            userId: data.session.user?.id,
+          });
+          return;
+        }
+        console.warn(
+          '[auth] stored anon credentials rejected, creating fresh account',
+          error?.message
+        );
+        window.localStorage.removeItem(EMAIL_KEY);
+        window.localStorage.removeItem(PASS_KEY);
+      }
+
+      // First visit: generate disposable credentials. We use a real-looking
+      // domain so GoTrue's email validator accepts it; deliverability isn't
+      // needed because email confirmation must be off in the Supabase project
+      // for this fallback to yield a session immediately.
+      const uuid =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const newEmail = `anon-${uuid}@webtekst-anon.fullfront.nl`;
+      const newPass = `${uuid}-${Math.random().toString(36).slice(2)}-${Math.random()
+        .toString(36)
+        .slice(2)}`;
+
+      const { data, error } = await supabase.auth.signUp({
+        email: newEmail,
+        password: newPass,
+      });
+
+      if (error) {
+        console.error('[auth] email-fallback signUp failed', {
+          name: error.name,
+          message: error.message,
+          status: error.status,
+        });
+        setAuthError(
+          `Kon geen anonieme sessie aanmaken: ${error.message}. ` +
+            'Check de browser console voor details.'
+        );
+        return;
+      }
+
+      if (!data.session) {
+        // No session returned means email confirmation is enabled — the user
+        // would need to click a link, which we can't do for a fake address.
+        console.error(
+          '[auth] signUp returned user but no session — email confirmation must be disabled in Supabase'
+        );
+        setAuthError(
+          'Anonieme sessie niet beschikbaar: schakel "Confirm email" UIT in Supabase ' +
+            '(Authentication → Providers → Email).'
+        );
+        return;
+      }
+
+      window.localStorage.setItem(EMAIL_KEY, newEmail);
+      window.localStorage.setItem(PASS_KEY, newPass);
+      console.info('[auth] email-fallback signUp succeeded (new visitor)', {
+        userId: data.session.user?.id,
+      });
     }
 
     supabase.auth.getSession().then(async ({ data }) => {
