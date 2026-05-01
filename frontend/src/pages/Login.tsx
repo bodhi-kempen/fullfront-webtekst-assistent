@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { LogIn, Lock, MailCheck, Send, UserPlus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { isEmbedded } from '../lib/embed';
 import { supabase } from '../lib/supabase';
 
 type Panel =
@@ -35,6 +36,8 @@ export function LoginPage() {
   // Send authenticated users to dashboard — UNLESS we're in reset flow,
   // where Supabase has them auth'd briefly to allow password change.
   if (!loading && user && panel !== 'reset') return <Navigate to="/" replace />;
+  // Embedded view never needs the login screen — AuthContext signs in anonymously.
+  if (isEmbedded()) return <Navigate to="/" replace />;
 
   function switchPanel(next: Panel) {
     setError(null);

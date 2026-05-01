@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { isEmbedded } from '../lib/embed';
 import { supabase } from '../lib/supabase';
 
 interface AuthContextValue {
@@ -25,7 +26,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const embed = isEmbedded();
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      // Embedded in the Fullfront members area: skip the login screen and
+      // sign in anonymously. The resulting auth.uid() satisfies the existing
+      // RLS policies, so projects scope correctly to this anonymous user.
+      if (!data.session && embed) {
+        console.info('[auth] embed mode — signing in anonymously');
+        const { error } = await supabase.auth.signInAnonymously();
+        if (error) {
+          console.error('[auth] anonymous sign-in failed', error);
+          setLoading(false);
+          return;
+        }
+        // onAuthStateChange (SIGNED_IN) will set the session and flip loading.
+        return;
+      }
+
       setSession(data.session);
       setLoading(false);
       if (data.session?.expires_at) {
@@ -38,6 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        // Resolve the loading gate that getSession() left open while waiting
+        // for anonymous sign-in (or any other late session arrival).
+        setLoading(false);
+      }
       // Log significant auth events so we can see refresh/expiry behavior in
       // long-running flows (the interview).
       if (event === 'TOKEN_REFRESHED') {
