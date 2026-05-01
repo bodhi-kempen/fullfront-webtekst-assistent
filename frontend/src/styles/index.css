@@ -228,6 +228,19 @@ body {
 .main::-webkit-scrollbar-thumb { background: #CBD5E0; border-radius: 4px; }
 
 /* ===================================================================
+ * EMBED MODE — app runs inside an iframe on the Fullfront members site.
+ * Topbar and sidebar are hidden in JS; collapse the offsets here so the
+ * main content fills the iframe viewport.
+ * ================================================================ */
+body.embed-mode { background: transparent; }
+body.embed-mode .main {
+  top: 0;
+  left: 0;
+}
+body.embed-mode .topbar,
+body.embed-mode .sidebar { display: none; }
+
+/* ===================================================================
  * PAGE
  * ================================================================ */
 

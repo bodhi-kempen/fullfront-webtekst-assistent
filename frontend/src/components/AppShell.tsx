@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { isEmbedded } from '../lib/embed';
 import { Topbar } from './Topbar';
 
 /** Topbar (60px fixed) + sidebar (220px fixed under topbar) + main content. */
@@ -13,10 +14,11 @@ export function AppShell({
    *  (used by the chat interview screen). */
   flush?: boolean;
 }) {
+  const embedded = isEmbedded();
   return (
     <>
-      <Topbar />
-      <aside className="sidebar">{sidebar}</aside>
+      {!embedded && <Topbar />}
+      {!embedded && <aside className="sidebar">{sidebar}</aside>}
       <main className={`main${flush ? ' main--flush' : ''}`}>{children}</main>
     </>
   );

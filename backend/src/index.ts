@@ -5,6 +5,7 @@ import cors from 'cors';
 import express from 'express';
 import { env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/error.js';
+import { frameEmbed } from './middleware/frame.js';
 import { contentRouter } from './routes/content.js';
 import { editingRouter } from './routes/editing.js';
 import { exportRouter } from './routes/export.js';
@@ -21,7 +22,8 @@ const SERVE_FRONTEND = existsSync(FRONTEND_DIST);
 
 const app = express();
 
-app.use(cors({ origin: env.corsOrigin }));
+app.use(cors({ origin: env.corsOrigin, credentials: true }));
+app.use(frameEmbed);
 app.use(express.json({ limit: '1mb' }));
 
 // Request logger

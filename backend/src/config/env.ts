@@ -30,10 +30,22 @@ function parseCorsOrigin(): string | string[] | true {
   return raw;
 }
 
+// Comma-separated list of origins allowed to embed the app in an <iframe>.
+// Drives the `Content-Security-Policy: frame-ancestors` header. Wildcards
+// (e.g. *.fullfront.nl) are passed through verbatim — CSP supports them.
+// Default in dev: 'self' only. In prod, leave empty to disable embedding,
+// or set the var to opt in.
+function parseFrameAncestors(): string[] {
+  const raw = process.env.ALLOWED_FRAME_ORIGINS;
+  if (!raw) return [];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
   corsOrigin: parseCorsOrigin(),
+  frameAncestors: parseFrameAncestors(),
   supabaseUrl: required('SUPABASE_URL'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
