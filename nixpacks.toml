@@ -5,7 +5,9 @@
 nixPkgs = ["nodejs_22", "npm-9_x"]
 
 [phases.install]
-cmds = ["npm install"]
+# --include=dev forces devDependencies (typescript, vite, tsc) even when
+# Railway sets NODE_ENV=production at install time.
+cmds = ["npm install --include=dev"]
 
 [phases.build]
 cmds = ["npm run build"]
