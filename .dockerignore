@@ -1,0 +1,42 @@
+# Anything we don't want shipped into the build context. Smaller context
+# = faster uploads + smaller layers.
+
+node_modules
+**/node_modules
+dist
+build
+**/dist
+**/build
+*.tsbuildinfo
+
+# VCS / IDE / OS
+.git
+.gitignore
+.github
+.vscode
+.idea
+.DS_Store
+*.swp
+*.swo
+
+# Env (real secrets are injected by Railway; templates already excluded by
+# the build's WORKDIR scope but be explicit anyway)
+.env
+.env.local
+.env.*.local
+
+# Local Claude state
+.claude
+
+# Logs / coverage / caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+coverage
+.cache
+.tmp
+
+# Docs / scripts that don't need to ship
+docs
+README.md
