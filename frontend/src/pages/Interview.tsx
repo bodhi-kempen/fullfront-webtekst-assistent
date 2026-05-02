@@ -56,10 +56,9 @@ export function InterviewPage() {
 
   const voiceRef = useRef<VoiceController | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const initialVoiceSupported = useMemo(() => isVoiceSupported(), []);
-  // Mutable so iOS Safari (where SpeechRecognition exists but start() throws)
-  // can disable voice on the first failure and never offer it again.
-  const [voiceAvailable, setVoiceAvailable] = useState(initialVoiceSupported);
+  // Computed once at mount: the API exists AND we're not in a cross-site
+  // frame. Errors from start() don't disable voice — see onError below.
+  const voiceSupported = useMemo(() => isVoiceSupported(), []);
   const toast = useToast();
 
   useEffect(() => {
@@ -96,7 +95,7 @@ export function InterviewPage() {
   }, [chat, partialVoice, sending]);
 
   useEffect(() => {
-    if (!initialVoiceSupported) return;
+    if (!voiceSupported) return;
     voiceRef.current = createVoiceController({
       lang: 'nl-NL',
       onPartial: (t) => setPartialVoice(t),
@@ -106,18 +105,20 @@ export function InterviewPage() {
         setCommittedSource('voice');
       },
       onError: (msg) => {
-        // iOS Safari + cross-origin iframes raise errors like 'not-allowed',
-        // 'service-not-allowed', or 'network' on start(). Treat any error as
-        // proof that voice won't work in this browser and remove the option.
+        // SpeechRecognition surfaces 'not-allowed', 'service-not-allowed',
+        // 'network', etc. Some are recoverable (permission later granted,
+        // header propagation, retry on flaky network), so we keep the mic
+        // visible and let the user try again rather than hiding it forever.
         setVoiceListening(false);
-        setVoiceAvailable(false);
-        toast.show('Spraakherkenning is niet beschikbaar in deze browser. Typ je antwoord.');
-        console.warn(`[voice] disabled after error: ${msg}`);
+        toast.show(
+          'Spraakherkenning lukte niet — typ je antwoord of probeer het opnieuw.'
+        );
+        console.warn(`[voice] error: ${msg}`);
       },
       onEnd: () => setVoiceListening(false),
     });
     return () => voiceRef.current?.abort();
-  }, [initialVoiceSupported, toast]);
+  }, [voiceSupported, toast]);
 
   function toggleVoice() {
     const v = voiceRef.current;
@@ -247,7 +248,7 @@ export function InterviewPage() {
 
         {!step?.done && step?.current_question && (
           <form onSubmit={onSubmit} className="chat-composer">
-            {voiceAvailable && (
+            {voiceSupported && (
               <button
                 type="button"
                 className={`mic-btn${voiceListening ? ' is-listening' : ''}`}
@@ -276,7 +277,7 @@ export function InterviewPage() {
               placeholder={
                 voiceListening
                   ? 'Aan het luisteren…'
-                  : voiceAvailable
+                  : voiceSupported
                     ? 'Typ je antwoord, of klik op de microfoon-knop'
                     : 'Typ je antwoord…'
               }
