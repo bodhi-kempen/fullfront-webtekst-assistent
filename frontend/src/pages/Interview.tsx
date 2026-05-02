@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { apiFetch } from '../lib/api';
 import {
   createVoiceController,
+  ensureMicrophonePermission,
   isVoiceSupported,
   type VoiceController,
 } from '../lib/voice';
@@ -120,16 +121,32 @@ export function InterviewPage() {
     return () => voiceRef.current?.abort();
   }, [voiceSupported, toast]);
 
-  function toggleVoice() {
+  async function toggleVoice() {
     const v = voiceRef.current;
     if (!v) return;
     if (v.isListening()) {
       v.stop();
-    } else {
-      setError(null);
-      v.start();
-      setVoiceListening(true);
+      return;
     }
+    setError(null);
+
+    // Pre-flight: in cross-origin iframes Chrome refuses to show the
+    // permission prompt for SpeechRecognition. Triggering getUserMedia
+    // first does prompt the user (when allow="microphone" is on the
+    // parent's iframe tag), so we ask there and only call start() once
+    // permission is granted.
+    const perm = await ensureMicrophonePermission();
+    if (perm.state === 'denied') {
+      toast.show(perm.message ?? 'Microfoon-toegang geweigerd');
+      return;
+    }
+    if (perm.state === 'unsupported') {
+      toast.show('Spraakherkenning werkt niet in deze browser. Typ je antwoord.');
+      return;
+    }
+
+    v.start();
+    setVoiceListening(true);
   }
 
   async function onSubmit(e: FormEvent) {

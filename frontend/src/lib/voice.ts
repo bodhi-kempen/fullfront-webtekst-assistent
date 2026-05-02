@@ -101,6 +101,82 @@ function logVoiceEnvironmentOnce(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Microphone permission gate
+// ---------------------------------------------------------------------------
+//
+// In a cross-origin iframe, Chrome won't show the permission prompt for
+// SpeechRecognition.start() — start() just fails silently with 'not-allowed'.
+// Calling getUserMedia({audio: true}) first DOES trigger the prompt, provided
+// the parent's <iframe allow="microphone"> tag is set. So we use it as a
+// pre-flight: it asks for permission, we immediately stop the stream, and
+// then call SpeechRecognition.start() now that permission is granted.
+
+export type MicPermissionState = 'granted' | 'denied' | 'unsupported';
+
+export interface MicPermissionResult {
+  state: MicPermissionState;
+  /** Human-readable message for the UI when state === 'denied'. */
+  message?: string;
+}
+
+const DENIED_MSG =
+  'Microfoon is geblokkeerd. Klik op het slotje in de adresbalk om toegang toe te staan.';
+
+export async function ensureMicrophonePermission(): Promise<MicPermissionResult> {
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+    console.warn('[voice] mediaDevices.getUserMedia not available');
+    return { state: 'unsupported' };
+  }
+
+  // permissions.query is Chrome/Edge/Firefox; Safari ignores the microphone
+  // permission name. Wrap in try/catch and fall through on failure.
+  let queriedState: PermissionState | null = null;
+  try {
+    if (navigator.permissions?.query) {
+      const status = await navigator.permissions.query({
+        name: 'microphone' as PermissionName,
+      });
+      queriedState = status.state;
+      console.info(`[voice] permissions.query microphone: ${status.state}`);
+    } else {
+      console.info('[voice] permissions.query unavailable, will probe via getUserMedia');
+    }
+  } catch (e) {
+    console.warn('[voice] permissions.query threw, will probe via getUserMedia', e);
+  }
+
+  if (queriedState === 'granted') {
+    return { state: 'granted' };
+  }
+  if (queriedState === 'denied') {
+    return { state: 'denied', message: DENIED_MSG };
+  }
+
+  // 'prompt' or unknown — request the actual permission via getUserMedia.
+  try {
+    console.info('[voice] calling getUserMedia({audio: true}) to trigger prompt');
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // We only wanted the permission grant, not the audio. Stopping the tracks
+    // releases the mic so SpeechRecognition can take it cleanly.
+    stream.getTracks().forEach((t) => t.stop());
+    console.info('[voice] getUserMedia granted, mic released');
+    return { state: 'granted' };
+  } catch (e) {
+    const err = e as { name?: string; message?: string };
+    const name = err.name ?? 'Error';
+    const message = err.message ?? '';
+    console.warn(`[voice] getUserMedia rejected: ${name}: ${message}`);
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      return { state: 'denied', message: DENIED_MSG };
+    }
+    return {
+      state: 'denied',
+      message: `Microfoon niet beschikbaar: ${name}${message ? ` — ${message}` : ''}.`,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
