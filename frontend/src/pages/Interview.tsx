@@ -102,6 +102,20 @@ export function InterviewPage() {
     return () => cancelAnimationFrame(id);
   }, [chat, partialVoice, sending]);
 
+  // When the iOS keyboard opens the visual viewport shrinks; without this
+  // the latest message can hide behind the new keyboard surface. Rerun the
+  // scroll-to-bottom on every viewport resize so the active question stays
+  // in view above the keyboard.
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (!vv) return;
+    const onResize = () => {
+      bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, []);
+
   useEffect(() => {
     if (!voiceSupported) return;
     voiceRef.current = createVoiceController({

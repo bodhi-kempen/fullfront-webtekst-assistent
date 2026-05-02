@@ -1099,23 +1099,63 @@ body.embed-mode .sidebar { display: none; }
     font-size: 16px;
   }
 
-  /* Composer pinned to the bottom of the viewport, above the iOS home bar
-     via safe-area-inset-bottom. The chat scroll area is given padding
-     so the last bubble isn't hidden behind the composer. */
-  .chat-composer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;
-    z-index: 50;
-    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
-  }
-  .chat-scroll { padding-bottom: 120px; }
-
   /* Cap auto-grow at ~4 lines on mobile so the composer never eats the
      scroll area. field-sizing: content honors max-height. */
   .chat-composer__textarea {
     max-height: 6.4em;
   }
+
+  /* Bottom safe-area on iOS home-bar phones — applied via padding on the
+     composer (which is laid out with flexbox, never fixed) so it stays
+     above the home indicator without breaking the flex column. */
+  .chat-composer {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  /* Stack form rows (input + button) on small screens so neither gets
+     squeezed below a usable size. Used by the dashboard's "new project"
+     card and a few other places. */
+  .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .form-row > * { width: 100%; }
+}
+
+/* Single-column projects on narrow screens. */
+@media (max-width: 600px) {
+  .project-grid { grid-template-columns: 1fr; }
+}
+
+/* ===================================================================
+ * EMBED-MODE LAYOUT — full-iframe flex column. position: fixed inside
+ * an iframe behaves badly on iOS (anchored to the iframe document, not
+ * the visible viewport), so we lay everything out as a normal flex
+ * column with dvh sizing instead.
+ * ================================================================ */
+body.embed-mode {
+  /* dvh adjusts when the iOS keyboard opens; fallback vh keeps non-iOS
+     happy. height (not min-height) prevents the body from extending
+     under the keyboard. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+body.embed-mode .main {
+  position: static;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+body.embed-mode .chat-shell {
+  height: 100%;
+  /* Already flex-column from the base rule; just confirm static
+     positioning so nothing inside it goes fixed. */
+}
+body.embed-mode .chat-composer {
+  position: static;
+  flex-shrink: 0;
+}
+body.embed-mode .chat-scroll {
+  -webkit-overflow-scrolling: touch;
 }
