@@ -2,6 +2,14 @@
  * Web Speech API wrapper for Dutch (nl-NL) voice dictation.
  * Falls back gracefully when the browser doesn't support SpeechRecognition.
  *
+ * Detection policy: be optimistic. If the SpeechRecognition constructor
+ * exists, expose voice input. Don't pre-emptively hide the mic based on
+ * iframe / origin heuristics — those have produced false negatives that
+ * blocked legitimate same-site embeds. If the browser actually refuses
+ * (cross-site iframe with no Permissions-Policy, no permission granted,
+ * etc.), recog.start() raises onError and the UI surfaces a toast,
+ * keeping the button visible so the user can retry.
+ *
  * The "live preview" mechanic: as the user speaks, partial transcripts
  * stream via onPartial(); on pause/stop, onFinal() fires with the committed
  * text so the caller can append to the textarea (which the user can then edit).
@@ -19,73 +27,90 @@ interface SpeechWindow extends Window {
   webkitSpeechRecognition?: new () => AnySpeechRecognition;
 }
 
-/** Naive registrable-domain extraction: take the last two labels.
- *  Works for .nl, .com, .org. Wrong for compound TLDs like .co.uk or
- *  .com.au — accepted trade-off since Fullfront runs on .nl. Swap in
- *  a Public Suffix List lookup if that ever changes. */
+// ---------------------------------------------------------------------------
+// Diagnostics — emit a one-shot environment dump the first time anyone asks
+// whether voice is supported. Helps debug "mic doesn't work in iframe" cases
+// without touching code.
+// ---------------------------------------------------------------------------
+
 function registrableDomain(hostname: string): string {
   const parts = hostname.split('.').filter(Boolean);
   if (parts.length <= 2) return hostname.toLowerCase();
   return parts.slice(-2).join('.').toLowerCase();
 }
 
-/** Best-effort hostname of the top frame, even when it's cross-origin.
- *  Returns null if we genuinely can't tell. */
 function topFrameHostname(): string | null {
   if (typeof window === 'undefined') return null;
   try {
     if (window.self === window.top) return window.location.hostname;
     return window.top!.location.hostname;
   } catch {
-    // Cross-origin access blocked — fall through to alternatives.
+    // cross-origin block — fall through
   }
-  // ancestorOrigins is WebKit/Blink only, ordered nearest → top.
-  const al = (
-    window.location as Location & { ancestorOrigins?: DOMStringList }
-  ).ancestorOrigins;
+  const al = (window.location as Location & { ancestorOrigins?: DOMStringList })
+    .ancestorOrigins;
   if (al && al.length > 0) {
     try {
       return new URL(al[al.length - 1]!).hostname;
     } catch {
-      // ignore
+      /* ignore */
     }
   }
-  // document.referrer carries the parent URL when we were just embedded,
-  // unless the parent strips it via Referrer-Policy. Falls through to null.
   if (typeof document !== 'undefined' && document.referrer) {
     try {
       return new URL(document.referrer).hostname;
     } catch {
-      // ignore
+      /* ignore */
     }
   }
   return null;
 }
 
-/** True when this window is embedded in a frame on a *different* registrable
- *  domain. iOS Safari blocks the microphone + Web Speech API in cross-site
- *  iframes, but it works fine in same-site iframes (e.g. webtekst.fullfront.nl
- *  inside fullfront.nl), so this is what the mic check should gate on. */
-function isCrossSiteFramed(): boolean {
-  if (typeof window === 'undefined') return false;
-  if (window.self === window.top) return false;
-  const parentHost = topFrameHostname();
-  if (!parentHost) {
-    // Couldn't determine parent — assume cross-site to stay safe (the mic
-    // would fail silently in the worst case otherwise).
-    return true;
+let envLogged = false;
+function logVoiceEnvironmentOnce(): void {
+  if (envLogged) return;
+  envLogged = true;
+  if (typeof window === 'undefined') return;
+
+  const w = window as SpeechWindow;
+  const apiAvailable = !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  const inIframe = window.self !== window.top;
+
+  let crossOrigin = false;
+  try {
+    crossOrigin = inIframe && window.top!.location.origin !== window.self.location.origin;
+  } catch {
+    crossOrigin = inIframe;
   }
-  return registrableDomain(window.location.hostname) !== registrableDomain(parentHost);
+
+  const myHost = window.location.hostname;
+  const parentHost = topFrameHostname();
+  const sameSite = parentHost
+    ? registrableDomain(myHost) === registrableDomain(parentHost)
+    : null;
+
+  console.info(`[voice] SpeechRecognition API available: ${apiAvailable}`);
+  console.info(`[voice] In iframe: ${inIframe}`);
+  console.info(`[voice] Cross-origin framed: ${crossOrigin}`);
+  console.info(`[voice] Self host: ${myHost}`);
+  console.info(`[voice] Parent host: ${parentHost ?? '(unknown)'}`);
+  console.info(`[voice] Same-site: ${sameSite ?? '(unknown)'}`);
+  console.info(
+    `[voice] Decision policy: optimistic — try start() and trust the browser`
+  );
 }
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 export function isVoiceSupported(): boolean {
   if (typeof window === 'undefined') return false;
-  // iOS Safari exposes webkitSpeechRecognition inside an iframe but start()
-  // silently fails when the parent is a *different site*. Same-site iframes
-  // are fine, so we hide the mic only in the cross-site case.
-  if (isCrossSiteFramed()) return false;
+  logVoiceEnvironmentOnce();
   const w = window as SpeechWindow;
-  return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  const supported = !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  console.info(`[voice] isVoiceSupported result: ${supported}`);
+  return supported;
 }
 
 export interface VoiceController {
@@ -130,10 +155,13 @@ export function createVoiceController(opts: VoiceOptions = {}): VoiceController 
   };
 
   recog.onerror = (event: AnySpeechRecognition) => {
-    opts.onError?.(event.error ?? 'unknown_error');
+    const code = event.error ?? 'unknown_error';
+    console.warn(`[voice] recognition.onerror: ${code}`, event);
+    opts.onError?.(code);
   };
 
   recog.onend = () => {
+    console.info('[voice] recognition.onend');
     listening = false;
     opts.onEnd?.();
   };
@@ -141,19 +169,24 @@ export function createVoiceController(opts: VoiceOptions = {}): VoiceController 
   return {
     start() {
       if (listening) return;
+      console.info('[voice] recognition.start() called');
       try {
         recog.start();
         listening = true;
       } catch (err) {
-        opts.onError?.(err instanceof Error ? err.message : 'start_failed');
+        const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+        console.warn(`[voice] recognition.start() threw synchronously: ${msg}`);
+        opts.onError?.(msg);
       }
     },
     stop() {
       if (!listening) return;
+      console.info('[voice] recognition.stop() called');
       recog.stop();
     },
     abort() {
       if (!listening) return;
+      console.info('[voice] recognition.abort() called');
       recog.abort();
       listening = false;
     },
