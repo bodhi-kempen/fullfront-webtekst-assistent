@@ -19,8 +19,27 @@ interface SpeechWindow extends Window {
   webkitSpeechRecognition?: new () => AnySpeechRecognition;
 }
 
+/** True when this window is embedded in a frame whose top origin differs
+ *  from ours. iOS Safari blocks microphone + Web Speech API access in those
+ *  frames, so we have to treat this case as "voice not available" up-front. */
+function isCrossOriginFramed(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.self === window.top) return false;
+    // Touching top.location.origin throws on a cross-origin frame. The catch
+    // below treats that throw as confirmation that we are cross-origin.
+    return window.top!.location.origin !== window.self.location.origin;
+  } catch {
+    return true;
+  }
+}
+
 export function isVoiceSupported(): boolean {
   if (typeof window === 'undefined') return false;
+  // iOS Safari exposes webkitSpeechRecognition inside an iframe but start()
+  // silently fails when the parent is a different origin. Pretend voice
+  // doesn't exist in that case so the UI never offers it.
+  if (isCrossOriginFramed()) return false;
   const w = window as SpeechWindow;
   return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
 }

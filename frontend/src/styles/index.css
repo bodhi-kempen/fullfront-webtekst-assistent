@@ -907,6 +907,9 @@ body.embed-mode .sidebar { display: none; }
   color: var(--text);
   line-height: 1.4;
   transition: border-color 0.15s;
+  /* Auto-grow with content where supported (Safari 18+, Chrome 123+).
+     Older browsers fall back to the default 1-row textarea + manual scroll. */
+  field-sizing: content;
 }
 .chat-composer__textarea:focus {
   outline: none;
@@ -950,7 +953,7 @@ body.embed-mode .sidebar { display: none; }
   transition: all 0.15s;
 }
 .send-btn:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); }
-.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .send-btn svg { width: 16px; height: 16px; }
 
 /* ===================================================================
@@ -1082,4 +1085,37 @@ body.embed-mode .sidebar { display: none; }
   .sidebar { transform: translateX(-100%); transition: transform 0.2s; }
   .sidebar.open { transform: translateX(0); width: 220px; }
   .main { left: 0; }
+
+  /* iOS zooms the page in when an input has font-size <16px and gets focus.
+     Bumping every text input prevents that. */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="search"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Composer pinned to the bottom of the viewport, above the iOS home bar
+     via safe-area-inset-bottom. The chat scroll area is given padding
+     so the last bubble isn't hidden behind the composer. */
+  .chat-composer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom)) 12px;
+    z-index: 50;
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+  }
+  .chat-scroll { padding-bottom: 120px; }
+
+  /* Cap auto-grow at ~4 lines on mobile so the composer never eats the
+     scroll area. field-sizing: content honors max-height. */
+  .chat-composer__textarea {
+    max-height: 6.4em;
+  }
 }

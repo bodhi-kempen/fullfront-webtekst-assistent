@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { LayoutDashboard, MessageCircle, Mic, Send, Square } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { useToast } from '../components/Toast';
 import { apiFetch } from '../lib/api';
 import {
   createVoiceController,
@@ -55,7 +56,11 @@ export function InterviewPage() {
 
   const voiceRef = useRef<VoiceController | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const voiceSupported = useMemo(() => isVoiceSupported(), []);
+  const initialVoiceSupported = useMemo(() => isVoiceSupported(), []);
+  // Mutable so iOS Safari (where SpeechRecognition exists but start() throws)
+  // can disable voice on the first failure and never offer it again.
+  const [voiceAvailable, setVoiceAvailable] = useState(initialVoiceSupported);
+  const toast = useToast();
 
   useEffect(() => {
     if (!projectId) return;
@@ -91,7 +96,7 @@ export function InterviewPage() {
   }, [chat, partialVoice, sending]);
 
   useEffect(() => {
-    if (!voiceSupported) return;
+    if (!initialVoiceSupported) return;
     voiceRef.current = createVoiceController({
       lang: 'nl-NL',
       onPartial: (t) => setPartialVoice(t),
@@ -101,13 +106,18 @@ export function InterviewPage() {
         setCommittedSource('voice');
       },
       onError: (msg) => {
-        setError(`Spraakherkenning: ${msg}`);
+        // iOS Safari + cross-origin iframes raise errors like 'not-allowed',
+        // 'service-not-allowed', or 'network' on start(). Treat any error as
+        // proof that voice won't work in this browser and remove the option.
         setVoiceListening(false);
+        setVoiceAvailable(false);
+        toast.show('Spraakherkenning is niet beschikbaar in deze browser. Typ je antwoord.');
+        console.warn(`[voice] disabled after error: ${msg}`);
       },
       onEnd: () => setVoiceListening(false),
     });
     return () => voiceRef.current?.abort();
-  }, [voiceSupported]);
+  }, [initialVoiceSupported, toast]);
 
   function toggleVoice() {
     const v = voiceRef.current;
@@ -237,7 +247,7 @@ export function InterviewPage() {
 
         {!step?.done && step?.current_question && (
           <form onSubmit={onSubmit} className="chat-composer">
-            {voiceSupported && (
+            {voiceAvailable && (
               <button
                 type="button"
                 className={`mic-btn${voiceListening ? ' is-listening' : ''}`}
@@ -266,7 +276,9 @@ export function InterviewPage() {
               placeholder={
                 voiceListening
                   ? 'Aan het luisteren…'
-                  : 'Typ je antwoord, of klik op de microfoon-knop'
+                  : voiceAvailable
+                    ? 'Typ je antwoord, of klik op de microfoon-knop'
+                    : 'Typ je antwoord…'
               }
               rows={1}
               disabled={sending}
