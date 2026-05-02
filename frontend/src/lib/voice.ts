@@ -180,9 +180,28 @@ export async function ensureMicrophonePermission(): Promise<MicPermissionResult>
 // Public API
 // ---------------------------------------------------------------------------
 
+/** iOS Safari detection. iPadOS 13+ reports a Mac UA, but the trick used
+ *  here (no MSStream + iPad/iPhone/iPod in UA) covers the common case. */
+export function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = window as unknown as { MSStream?: unknown };
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !w.MSStream;
+}
+
 export function isVoiceSupported(): boolean {
   if (typeof window === 'undefined') return false;
   logVoiceEnvironmentOnce();
+
+  // iOS Safari refuses Web Speech API in iframes — hard Apple restriction
+  // we can't work around. The OS-level keyboard mic icon is the answer for
+  // those users, and the UI nudges them toward it via the placeholder.
+  if (isIOS() && window.self !== window.top) {
+    console.info('[voice] iOS Safari in iframe — voice unavailable');
+    console.info('[voice] isVoiceSupported result: false');
+    return false;
+  }
+
   const w = window as SpeechWindow;
   const supported = !!(w.SpeechRecognition || w.webkitSpeechRecognition);
   console.info(`[voice] isVoiceSupported result: ${supported}`);

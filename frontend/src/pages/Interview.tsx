@@ -7,6 +7,7 @@ import { apiFetch } from '../lib/api';
 import {
   createVoiceController,
   ensureMicrophonePermission,
+  isIOS,
   isVoiceSupported,
   type VoiceController,
 } from '../lib/voice';
@@ -60,6 +61,12 @@ export function InterviewPage() {
   // Computed once at mount: the API exists AND we're not in a cross-site
   // frame. Errors from start() don't disable voice — see onError below.
   const voiceSupported = useMemo(() => isVoiceSupported(), []);
+  // Specific to iOS Safari in an iframe: Web Speech is hard-blocked but the
+  // OS-level keyboard dictation icon still works. Surface that hint.
+  const iosInIframe = useMemo(
+    () => isIOS() && typeof window !== 'undefined' && window.self !== window.top,
+    []
+  );
   const toast = useToast();
 
   useEffect(() => {
@@ -294,9 +301,11 @@ export function InterviewPage() {
               placeholder={
                 voiceListening
                   ? 'Aan het luisteren…'
-                  : voiceSupported
-                    ? 'Typ je antwoord, of klik op de microfoon-knop'
-                    : 'Typ je antwoord…'
+                  : iosInIframe
+                    ? 'Typ je antwoord (gebruik 🎤 op je toetsenbord om te dicteren)'
+                    : voiceSupported
+                      ? 'Typ je antwoord, of klik op de microfoon-knop'
+                      : 'Typ je antwoord…'
               }
               rows={1}
               disabled={sending}
