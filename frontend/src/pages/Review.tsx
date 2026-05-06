@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Download,
+  ExternalLink,
   FileText,
   LayoutDashboard,
   Pencil,
@@ -108,6 +109,27 @@ export function ReviewPage() {
       setError(err instanceof Error ? err.message : 'PDF-download mislukt');
     }
   }
+  // Note: keep this synchronous up to window.open so the click gesture
+  // isn't lost — popup blockers gate window.open behind a recent user
+  // interaction, and crossing an await first invalidates that.
+  function exportToGoogleDocs() {
+    setError(null);
+    const popup = window.open(
+      'https://docs.google.com/document/u/0/?usp=direct_url',
+      '_blank',
+      'noopener,noreferrer'
+    );
+    if (!popup) {
+      toast.show('Sta popups toe om Google Docs te openen.');
+    }
+    apiDownload(`/api/projects/${projectId}/export/word`, { method: 'POST' })
+      .then(() =>
+        toast.show('Word-bestand gedownload. Upload het in Google Docs.')
+      )
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Word-download mislukt')
+      );
+  }
   async function copyPage(pageId: string) {
     setError(null);
     try {
@@ -190,6 +212,9 @@ export function ReviewPage() {
             </button>
             <button type="button" className="nav-item" onClick={() => void downloadPdf()}>
               <Download /> PDF
+            </button>
+            <button type="button" className="nav-item" onClick={exportToGoogleDocs}>
+              <ExternalLink /> Google Docs
             </button>
           </div>
         </>
@@ -296,6 +321,14 @@ export function ReviewPage() {
             onClick={() => void downloadPdf()}
           >
             <Download /> PDF
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact"
+            onClick={exportToGoogleDocs}
+            title="Download Word + open Google Docs in nieuw tabblad"
+          >
+            <ExternalLink /> Google Docs
           </button>
         </div>
       </div>
