@@ -31,7 +31,7 @@ function formatDateNL(iso: string): string {
 }
 
 export function AdminPage() {
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading, adminLoading } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<Stats | null>(null);
   const [projects, setProjects] = useState<AdminProject[] | null>(null);
@@ -59,7 +59,10 @@ export function AdminPage() {
     };
   }, [isAdmin]);
 
-  if (authLoading) {
+  // Wait for both the session AND the /api/admin/me probe before deciding.
+  // Otherwise isAdmin's default-false value redirects the page away before
+  // the probe has a chance to confirm admin status.
+  if (authLoading || adminLoading) {
     return (
       <AppShell sidebar={<></>}>
         <p className="muted">Bezig met laden…</p>

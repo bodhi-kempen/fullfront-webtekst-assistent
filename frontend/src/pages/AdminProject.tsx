@@ -73,7 +73,7 @@ interface AdminProjectResponse {
 export function AdminProjectPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading, adminLoading } = useAuth();
   const [data, setData] = useState<AdminProjectResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,7 +92,7 @@ export function AdminProjectPage() {
     };
   }, [id, isAdmin]);
 
-  if (authLoading) {
+  if (authLoading || adminLoading) {
     return (
       <AppShell sidebar={<></>}>
         <p className="muted">Bezig met laden…</p>

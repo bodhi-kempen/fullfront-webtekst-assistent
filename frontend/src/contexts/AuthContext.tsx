@@ -17,6 +17,10 @@ interface AuthContextValue {
   loading: boolean;
   /** True when the current user's email is in ADMIN_EMAILS (server-side check). */
   isAdmin: boolean;
+  /** True while /api/admin/me is in flight after sign-in. Pages that gate on
+   *  isAdmin must wait for this to be false to avoid redirecting on the
+   *  default-false value before the probe returns. */
+  adminLoading: boolean;
   /** Surfaced when embed-mode anonymous sign-in fails or times out. */
   authError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
@@ -31,22 +35,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
 
   // Probe whether the signed-in user has admin privileges. Skipped for
   // anonymous embed users (no email → can't be admin). The server is the
   // source of truth via ADMIN_EMAILS; we just cache the boolean for the UI.
+  // adminLoading gates pages so they don't redirect on the default-false
+  // value while the probe is still in flight.
   useEffect(() => {
     if (!session?.user?.email) {
       setIsAdmin(false);
+      setAdminLoading(false);
       return;
     }
     let cancelled = false;
+    setAdminLoading(true);
     apiFetch<{ is_admin: boolean }>('/api/admin/me')
       .then((res) => {
         if (!cancelled) setIsAdmin(!!res.is_admin);
       })
       .catch(() => {
         if (!cancelled) setIsAdmin(false);
+      })
+      .finally(() => {
+        if (!cancelled) setAdminLoading(false);
       });
     return () => {
       cancelled = true;
@@ -247,6 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       loading,
       isAdmin,
+      adminLoading,
       authError,
       async signIn(email, password) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -261,7 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       },
     }),
-    [session, loading, isAdmin, authError]
+    [session, loading, isAdmin, adminLoading, authError]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
