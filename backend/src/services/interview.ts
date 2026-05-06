@@ -16,6 +16,7 @@ import {
   classifyBlogOptin,
   classifyMoreServices,
   decideInterviewTurn,
+  proposePagesQuestion,
   type PriorTurn,
 } from './interview-ai.js';
 
@@ -739,7 +740,8 @@ async function applyDecision(
       return emitFromCandidate(meta, answers, project, acknowledgement, skipped);
     }
     // Now advance once more for the actual next.
-    const after = advanceMeta(meta);
+    const afterRaw = advanceMeta(meta);
+    const after = await maybeReplacePagesQuestion(afterRaw, project, answers);
     if (!after) {
       meta.pending = null;
       await setMeta(projectId, meta);
@@ -757,7 +759,8 @@ async function applyDecision(
   }
 
   // Advance: commit the speculative advance (re-run on the real meta).
-  const next = advanceMeta(meta);
+  const nextRaw = advanceMeta(meta);
+  const next = await maybeReplacePagesQuestion(nextRaw, project, answers);
   if (!next) {
     meta.pending = null;
     await setMeta(projectId, meta);
@@ -772,6 +775,33 @@ async function applyDecision(
   meta.pending = next;
   await setMeta(projectId, meta);
   return emitFromCandidate(meta, answers, project, acknowledgement, next);
+}
+
+/** If the next planned question is p10q12 ("Welke pagina's wil je?"), replace
+ *  its text with an AI-generated proposal so the user only has to confirm or
+ *  tweak. The id stays p10q12 so the rest of the state machine and strategy
+ *  AI keep treating it as the same data point. */
+async function maybeReplacePagesQuestion(
+  emit: NextEmit | null,
+  project: ProjectRow,
+  answers: AnswerRow[]
+): Promise<NextEmit | null> {
+  if (!emit) return emit;
+  if (emit.question_id !== 'p10q12') return emit;
+  try {
+    // The interview transcript already names the business (DEEL 1 q1), so
+    // the AI gets it via answersDigest and we don't need to thread it
+    // separately from ProjectRow (which doesn't carry business_name yet).
+    const proposal = await proposePagesQuestion({
+      archetype: project.archetype,
+      businessName: null,
+      answersDigest: priorAnswersSummary(answers),
+    });
+    return { ...emit, question_text: proposal };
+  } catch (err) {
+    console.error('[interview] page-proposal failed, falling back to plain question', err);
+    return emit;
+  }
 }
 
 function emitFromCandidate(

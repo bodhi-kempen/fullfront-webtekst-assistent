@@ -1128,6 +1128,78 @@ body.embed-mode .sidebar { display: none; }
 }
 
 /* ===================================================================
+ * REVIEW PAGE — horizontal page tabs + export buttons.
+ * Sticky at the top of the scroll area so the tabs survive long pages.
+ * Works without a sidebar (embed mode hides it) and coexists with the
+ * sidebar when present.
+ * ================================================================ */
+.review-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin: -28px -32px 20px;
+}
+.review-tabs__pages {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.review-tabs__pages::-webkit-scrollbar { height: 4px; }
+.review-tabs__pages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.review-tab {
+  flex: none;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-sec);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.review-tab:hover { background: var(--surface2); color: var(--text); }
+.review-tab.active {
+  background: var(--accent-dim);
+  color: var(--text);
+  border-color: var(--accent);
+}
+.review-tabs__exports {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+.btn-compact {
+  padding: 7px 12px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-compact svg { width: 14px; height: 14px; }
+
+@media (max-width: 600px) {
+  .review-tabs { margin: -28px -16px 16px; padding: 10px 12px; }
+  .review-tabs__exports .btn-compact { padding: 6px 10px; }
+}
+
+/* In embed mode the main has no padding, so the negative margin we use
+ * above to bleed the bar full-width would push the bar off-screen.
+ * Reset to zero margin there. */
+body.embed-mode .review-tabs { margin: 0 0 16px; padding: 10px 16px; }
+
+/* ===================================================================
  * EMBED-MODE LAYOUT — full-iframe flex column. position: fixed inside
  * an iframe behaves badly on iOS (anchored to the iframe document, not
  * the visible viewport), so we lay everything out as a normal flex

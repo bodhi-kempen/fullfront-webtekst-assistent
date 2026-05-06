@@ -267,6 +267,39 @@ export function ReviewPage() {
 
   return (
     <AppShell sidebar={sidebar}>
+      <div className="review-tabs">
+        <div className="review-tabs__pages" role="tablist" aria-label="Pagina's">
+          {pages.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={activePage?.id === p.id}
+              className={`review-tab${activePage?.id === p.id ? ' active' : ''}`}
+              onClick={() => setActivePageId(p.id)}
+            >
+              {p.title}
+            </button>
+          ))}
+        </div>
+        <div className="review-tabs__exports">
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact"
+            onClick={() => void downloadWord()}
+          >
+            <Download /> Word
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact"
+            onClick={() => void downloadPdf()}
+          >
+            <Download /> PDF
+          </button>
+        </div>
+      </div>
+
       <PageHeader
         title={activePage?.title ?? 'Review'}
         subtitle={activePage?.slug ? `/${activePage.slug}` : '/'}

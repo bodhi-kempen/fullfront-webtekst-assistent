@@ -309,6 +309,97 @@ export async function classifyMoreServices(answer: string): Promise<boolean> {
   return result.yes;
 }
 
+// ---------------------------------------------------------------------------
+// Page proposal — replaces the bald p10q12 "Welke pagina's wil je?" question.
+// We let the AI synthesize a tailored proposal from what the interview has
+// already covered, and the user simply confirms or tweaks it.
+// ---------------------------------------------------------------------------
+
+const PAGE_PROPOSAL_TOOL = {
+  name: 'propose',
+  description:
+    "Stel een lijst pagina's voor en formatteer die als één korte assistant-message in markdown.",
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      proposal_text: {
+        type: 'string',
+        description:
+          "De volledige tekst van het voorstel zoals de assistant die zal uitspreken. " +
+          "Begin met een korte zin, dan een bullet-lijst van 4-6 pagina's met na de naam een streepje en een hele korte uitleg, " +
+          "en eindig met een vraag of het zo akkoord is.",
+      },
+    },
+    required: ['proposal_text'],
+    additionalProperties: false,
+  },
+};
+
+export async function proposePagesQuestion(opts: {
+  archetype: Archetype | null;
+  businessName: string | null;
+  answersDigest: string;
+}): Promise<string> {
+  const archetypeName = opts.archetype ?? 'onbekend archetype';
+  const businessName = opts.businessName ?? '(naam onbekend)';
+
+  const system = `
+Je bent een website-strateeg en stelt een ondernemer een set pagina's voor
+op basis van een interview dat net is afgerond.
+
+## Pagina-naamgeving per archetype
+Pas de naamgeving aan het type bedrijf aan:
+- service_zzp / lokale_ambacht: "Diensten" of "Wat ik doe"
+- visueel_portfolio: "Portfolio" of "Werk"
+- horeca: "Menu" of "Kaart"
+- webshop: "Producten" of "Shop"
+- boeking_gedreven (kapper, salon, PT, yoga): "Behandelingen", "Lessen" of "Wat we aanbieden"
+
+## Standaardstructuur
+Bijna elk bedrijf krijgt: Home, Over [naam], [Diensten/Behandelingen/Lessen/Portfolio], Ervaringen, Contact.
+
+Voeg toe als het past:
+- FAQ — als het interview veel terugkerende klantvragen liet zien
+- Pakketten / prijzen-pagina — als prijzen complex of strategisch zijn
+
+Laat weg als het niet past:
+- Ervaringen — als de ondernemer expliciet zei (bijna) geen reviews te hebben
+
+## Output-stijl
+- Schrijf in het Nederlands.
+- Spreek aan met "je".
+- Begin met "Op basis van wat je me hebt verteld" of vergelijkbaar.
+- Bullets in markdown (- ).
+- Na elke paginanaam een korte uitleg (max ~12 woorden) met em-streep of haakjes.
+- Eindig met "Klinkt dat goed, of wil je iets toevoegen of weglaten?".
+- Geen lege regels in bullets.
+- Maximaal 6 pagina's.
+`.trim();
+
+  const user = `
+## Archetype
+${archetypeName}
+
+## Bedrijfsnaam
+${businessName}
+
+## Samenvatting van het interview
+${opts.answersDigest}
+
+Stel nu een passende pagina-lijst voor via de propose-tool.
+`.trim();
+
+  const out = await callTool<{ proposal_text: string }>({
+    systemPrompt: system,
+    messages: [{ role: 'user', content: user }],
+    tool: PAGE_PROPOSAL_TOOL,
+    maxTokens: 600,
+    purpose: 'interview/pages-proposal',
+  });
+
+  return out.proposal_text.trim();
+}
+
 export async function classifyBlogOptin(answer: string): Promise<boolean> {
   const result = await callTool<{ yes: boolean }>({
     systemPrompt:
