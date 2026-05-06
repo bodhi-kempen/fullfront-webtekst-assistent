@@ -62,6 +62,9 @@ export function AdminPage() {
   // Wait for both the session AND the /api/admin/me probe before deciding.
   // Otherwise isAdmin's default-false value redirects the page away before
   // the probe has a chance to confirm admin status.
+  console.info(
+    `[admin-page] render: authLoading=${authLoading} adminLoading=${adminLoading} isAdmin=${isAdmin}`
+  );
   if (authLoading || adminLoading) {
     return (
       <AppShell sidebar={<></>}>
@@ -69,7 +72,10 @@ export function AdminPage() {
       </AppShell>
     );
   }
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!isAdmin) {
+    console.warn('[admin-page] redirecting to / because isAdmin=false');
+    return <Navigate to="/" replace />;
+  }
 
   const sidebar = (
     <div className="sidebar-group">

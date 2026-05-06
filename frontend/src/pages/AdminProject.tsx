@@ -92,6 +92,9 @@ export function AdminProjectPage() {
     };
   }, [id, isAdmin]);
 
+  console.info(
+    `[admin-project] render: authLoading=${authLoading} adminLoading=${adminLoading} isAdmin=${isAdmin}`
+  );
   if (authLoading || adminLoading) {
     return (
       <AppShell sidebar={<></>}>
@@ -99,7 +102,10 @@ export function AdminProjectPage() {
       </AppShell>
     );
   }
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!isAdmin) {
+    console.warn('[admin-project] redirecting to / because isAdmin=false');
+    return <Navigate to="/" replace />;
+  }
 
   const sidebar = (
     <div className="sidebar-group">

@@ -35,35 +35,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [adminLoading, setAdminLoading] = useState(false);
+  // We track which email the probe has finished for. adminLoading is then
+  // DERIVED from current session vs. probedEmail — that way the "probe
+  // pending" state is true on the very first render after sign-in, instead
+  // of flipping true only after the effect runs (one render too late).
+  const [probedEmail, setProbedEmail] = useState<string | null>(null);
+  const currentEmail = session?.user?.email ?? null;
+  const adminLoading = currentEmail !== null && probedEmail !== currentEmail;
 
   // Probe whether the signed-in user has admin privileges. Skipped for
-  // anonymous embed users (no email → can't be admin). The server is the
-  // source of truth via ADMIN_EMAILS; we just cache the boolean for the UI.
-  // adminLoading gates pages so they don't redirect on the default-false
-  // value while the probe is still in flight.
+  // anonymous embed users (no email → can't be admin). Server is the
+  // source of truth via ADMIN_EMAILS.
   useEffect(() => {
-    if (!session?.user?.email) {
+    console.info(
+      `[admin] effect for email=${currentEmail ?? '(none)'} ` +
+        `(probed=${probedEmail ?? '(none)'}, isAdmin=${isAdmin})`
+    );
+    if (!currentEmail) {
       setIsAdmin(false);
-      setAdminLoading(false);
+      setProbedEmail(null);
+      return;
+    }
+    if (probedEmail === currentEmail) {
+      // Already resolved for this email, don't re-fire.
       return;
     }
     let cancelled = false;
-    setAdminLoading(true);
     apiFetch<{ is_admin: boolean }>('/api/admin/me')
       .then((res) => {
-        if (!cancelled) setIsAdmin(!!res.is_admin);
+        if (cancelled) return;
+        console.info(`[admin] /api/admin/me → is_admin=${res.is_admin}`);
+        setIsAdmin(!!res.is_admin);
       })
-      .catch(() => {
-        if (!cancelled) setIsAdmin(false);
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn('[admin] /api/admin/me failed', err);
+        setIsAdmin(false);
       })
       .finally(() => {
-        if (!cancelled) setAdminLoading(false);
+        if (cancelled) return;
+        setProbedEmail(currentEmail);
       });
     return () => {
       cancelled = true;
     };
-  }, [session?.user?.email]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentEmail]);
 
   useEffect(() => {
     // Detect embed mode synchronously, BEFORE any auth/redirect decisions.
