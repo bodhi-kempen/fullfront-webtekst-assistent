@@ -153,6 +153,16 @@ export function AdminProjectPage() {
       (err) => setError(err instanceof Error ? err.message : 'PDF-download mislukt')
     );
   }
+  function downloadInterviewCsv() {
+    apiDownload(`/api/admin/export/projects/${project.id}/interview.csv`).catch(
+      (err) => setError(err instanceof Error ? err.message : 'CSV-download mislukt')
+    );
+  }
+  function downloadFullCsv() {
+    apiDownload(`/api/admin/export/projects/${project.id}/full.csv`).catch(
+      (err) => setError(err instanceof Error ? err.message : 'CSV-download mislukt')
+    );
+  }
 
   return (
     <AppShell sidebar={sidebar}>
@@ -189,6 +199,31 @@ export function AdminProjectPage() {
           ) : null
         }
       />
+
+      {/* Admin exports — interview only or interview + strategy + content. */}
+      <div className="card mt-4">
+        <div className="card-title">Admin export</div>
+        <p className="muted">
+          CSV-bestanden voor kwaliteitscontrole. UTF-8 met BOM zodat Excel
+          en Google Sheets de Nederlandse tekens correct tonen.
+        </p>
+        <div className="form-row mt-2" style={{ gap: 8 }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact"
+            onClick={downloadInterviewCsv}
+          >
+            <Download /> Interview (CSV)
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact"
+            onClick={downloadFullCsv}
+          >
+            <Download /> Alles (CSV)
+          </button>
+        </div>
+      </div>
 
       {/* Usage */}
       <div className="card mt-4">

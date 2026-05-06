@@ -5,6 +5,40 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { getPagesWithContent } from '../services/content.js';
 import { getStrategy } from '../services/strategy.js';
 
+// ---------------------------------------------------------------------------
+// CSV helpers — RFC 4180 escaping. UTF-8 BOM prefix so Excel auto-detects
+// the encoding and shows é/ë/ñ correctly instead of mojibake.
+// ---------------------------------------------------------------------------
+const UTF8_BOM = '﻿';
+
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const s = typeof value === 'string' ? value : String(value);
+  // Always quote: simpler, never wrong, and Sheets/Excel handle it fine.
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function csvLine(cells: unknown[]): string {
+  return cells.map(csvCell).join(',') + '\r\n';
+}
+
+function safeFileName(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'project';
+}
+
+function sendCsv(res: import('express').Response, filename: string, body: string): void {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${filename}"`
+  );
+  res.send(UTF8_BOM + body);
+}
+
 export const adminRouter = Router();
 
 // All admin routes require auth. /me is the only one any authed user can hit
@@ -159,6 +193,151 @@ adminRouter.get('/projects/:id', async (req, res, next) => {
         call_count: usageRows.length,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CSV exports
+// ---------------------------------------------------------------------------
+
+interface AnswerRowDb {
+  question_id: string;
+  question_text: string;
+  answer_text: string;
+  phase: number;
+  sequence_order: number;
+  is_followup: boolean;
+  answer_source: 'voice' | 'typed';
+  created_at: string;
+}
+
+async function loadAnswers(projectId: string): Promise<AnswerRowDb[]> {
+  const { data, error } = await supabaseAdmin
+    .from('interview_answers')
+    .select(
+      'question_id, question_text, answer_text, phase, sequence_order, is_followup, answer_source, created_at'
+    )
+    .eq('project_id', projectId)
+    .order('sequence_order', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as AnswerRowDb[];
+}
+
+function interviewCsv(answers: AnswerRowDb[]): string {
+  let out = csvLine([
+    'deel',
+    'vraag_id',
+    'ai_vraag',
+    'ondernemer_antwoord',
+    'is_doorvraag',
+    'bron',
+    'tijdstip',
+  ]);
+  for (const a of answers) {
+    out += csvLine([
+      a.phase,
+      a.question_id,
+      a.question_text,
+      a.answer_text,
+      a.is_followup ? 'ja' : 'nee',
+      a.answer_source,
+      a.created_at,
+    ]);
+  }
+  return out;
+}
+
+// GET /api/admin/export/projects/:id/interview.csv
+adminRouter.get('/export/projects/:id/interview.csv', async (req, res, next) => {
+  try {
+    const projectId = req.params.id!;
+    const { data: project } = await supabaseAdmin
+      .from('projects')
+      .select('name')
+      .eq('id', projectId)
+      .maybeSingle();
+    if (!project) return res.status(404).json({ error: 'Project niet gevonden' });
+
+    const answers = await loadAnswers(projectId);
+    const filename = `${safeFileName(project.name ?? 'project')}-interview.csv`;
+    sendCsv(res, filename, interviewCsv(answers));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/export/projects/:id/full.csv — interview + strategy + content,
+// concatenated with section headers separated by blank lines.
+adminRouter.get('/export/projects/:id/full.csv', async (req, res, next) => {
+  try {
+    const projectId = req.params.id!;
+
+    const { data: project } = await supabaseAdmin
+      .from('projects')
+      .select('name')
+      .eq('id', projectId)
+      .maybeSingle();
+    if (!project) return res.status(404).json({ error: 'Project niet gevonden' });
+
+    const [answers, strategy, pages] = await Promise.all([
+      loadAnswers(projectId),
+      getStrategy(projectId).catch(() => null),
+      getPagesWithContent(projectId).catch(() => []),
+    ]);
+
+    let body = '';
+
+    // ---- Sectie 1: interview ----
+    body += csvLine(['SECTIE 1 — INTERVIEW']);
+    body += interviewCsv(answers);
+    body += '\r\n';
+
+    // ---- Sectie 2: strategie ----
+    body += csvLine(['SECTIE 2 — STRATEGIE']);
+    body += csvLine(['veld', 'waarde']);
+    if (strategy) {
+      // JSON-stringify nested values (suggested_pages, archetype_config) so
+      // they survive a single CSV cell.
+      const ordered: Array<[string, unknown]> = [
+        ['website_type', strategy.website_type],
+        ['tone_of_voice', strategy.tone_of_voice],
+        ['addressing', strategy.addressing],
+        ['primary_cta', strategy.primary_cta],
+        ['archetype_config', strategy.archetype_config],
+        ['suggested_pages', strategy.suggested_pages],
+      ];
+      for (const [field, value] of ordered) {
+        const v = value === null || value === undefined
+          ? ''
+          : typeof value === 'object'
+            ? JSON.stringify(value)
+            : String(value);
+        body += csvLine([field, v]);
+      }
+    } else {
+      body += csvLine(['(geen strategie gegenereerd)', '']);
+    }
+    body += '\r\n';
+
+    // ---- Sectie 3: gegenereerde teksten ----
+    body += csvLine(['SECTIE 3 — GEGENEREERDE TEKSTEN']);
+    body += csvLine(['pagina', 'sectie', 'veld', 'tekst']);
+    for (const p of pages) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const s of (p as any).sections ?? []) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const f of s.fields ?? []) {
+          if (!f.field_value) continue;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          body += csvLine([(p as any).title, s.section_type, f.field_name, f.field_value]);
+        }
+      }
+    }
+
+    const filename = `${safeFileName(project.name ?? 'project')}-full.csv`;
+    sendCsv(res, filename, body);
   } catch (err) {
     next(err);
   }
