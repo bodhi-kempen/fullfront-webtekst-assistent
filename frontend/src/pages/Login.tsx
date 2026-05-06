@@ -1,20 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
-import { LogIn, Lock, MailCheck, Send, UserPlus } from 'lucide-react';
+import { LogIn, Lock, MailCheck, Send } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { isEmbedded } from '../lib/embed';
 import { supabase } from '../lib/supabase';
 
-type Panel =
-  | 'login'
-  | 'signup'
-  | 'forgot'
-  | 'forgot_sent'
-  | 'reset'
-  | 'verification_pending';
+type Panel = 'login' | 'forgot' | 'forgot_sent' | 'reset';
 
 export function LoginPage() {
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, signIn, loading } = useAuth();
   const [panel, setPanel] = useState<Panel>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,32 +48,6 @@ export function LoginPage() {
       await signIn(email, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Inloggen mislukt');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onSignup(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (password.length < 8) {
-      setError('Wachtwoord moet minimaal 8 tekens zijn.');
-      return;
-    }
-    if (password !== password2) {
-      setError('Wachtwoorden komen niet overeen.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await signUp(email, password);
-      // If email confirmation is on, signUp returns no session yet → show pending.
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        setPanel('verification_pending');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Account aanmaken mislukt');
     } finally {
       setBusy(false);
     }
@@ -169,59 +137,6 @@ export function LoginPage() {
             <button type="submit" className="btn btn-primary login-btn" disabled={busy}>
               <LogIn /> {busy ? 'Bezig…' : 'Inloggen'}
             </button>
-            <div className="auth-switch-link">
-              Nog geen account? <a onClick={() => switchPanel('signup')}>Registreer hier</a>
-            </div>
-          </form>
-        )}
-
-        {panel === 'signup' && (
-          <form onSubmit={onSignup}>
-            <div className="login-title">Account aanmaken</div>
-            <div className="login-subtitle">Maak een gratis account aan.</div>
-            {error && <div className="login-error">{error}</div>}
-            <div className="form-group">
-              <label className="form-label">E-mailadres</label>
-              <input
-                className="form-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Wachtwoord</label>
-              <input
-                className="form-input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimaal 8 tekens"
-                autoComplete="new-password"
-                required
-                minLength={8}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Wachtwoord herhalen</label>
-              <input
-                className="form-input"
-                type="password"
-                value={password2}
-                onChange={(e) => setPassword2(e.target.value)}
-                autoComplete="new-password"
-                required
-                minLength={8}
-              />
-            </div>
-            <button type="submit" className="btn btn-primary login-btn" disabled={busy}>
-              <UserPlus /> {busy ? 'Bezig…' : 'Account aanmaken'}
-            </button>
-            <div className="auth-switch-link">
-              Al een account? <a onClick={() => switchPanel('login')}>Log in</a>
-            </div>
           </form>
         )}
 
@@ -307,24 +222,6 @@ export function LoginPage() {
           </form>
         )}
 
-        {panel === 'verification_pending' && (
-          <div>
-            <div className="login-info-icon">
-              <MailCheck />
-            </div>
-            <div className="login-title" style={{ textAlign: 'center' }}>
-              Check je e-mail
-            </div>
-            <div className="login-subtitle" style={{ textAlign: 'center' }}>
-              We hebben een bevestigingslink gestuurd naar
-              <br />
-              <strong style={{ color: 'var(--text)' }}>{email}</strong>
-            </div>
-            <div className="auth-switch-link">
-              <a onClick={() => switchPanel('login')}>← terug naar inloggen</a>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
