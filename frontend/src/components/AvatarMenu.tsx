@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 function deriveInitials(input: string | null | undefined): string {
@@ -12,7 +13,8 @@ function deriveInitials(input: string | null | undefined): string {
 }
 
 export function AvatarMenu() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const initials = deriveInitials(user?.email);
@@ -54,6 +56,20 @@ export function AvatarMenu() {
         <span className="avatar-circle">{initials}</span>
       </button>
       <div className={`avatar-menu${open ? ' open' : ''}`} role="menu">
+        {isAdmin && (
+          <button
+            type="button"
+            className="avatar-menu-item"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              navigate('/admin');
+            }}
+          >
+            <ShieldCheck />
+            Admin
+          </button>
+        )}
         <button
           type="button"
           className="avatar-menu-item"

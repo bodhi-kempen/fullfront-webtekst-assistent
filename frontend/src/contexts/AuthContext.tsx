@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { apiFetch } from '../lib/api';
 import { isEmbedded } from '../lib/embed';
 import { supabase } from '../lib/supabase';
 
@@ -14,6 +15,8 @@ interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  /** True when the current user's email is in ADMIN_EMAILS (server-side check). */
+  isAdmin: boolean;
   /** Surfaced when embed-mode anonymous sign-in fails or times out. */
   authError: string | null;
   signIn: (email: string, password: string) => Promise<void>;
@@ -27,6 +30,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Probe whether the signed-in user has admin privileges. Skipped for
+  // anonymous embed users (no email → can't be admin). The server is the
+  // source of truth via ADMIN_EMAILS; we just cache the boolean for the UI.
+  useEffect(() => {
+    if (!session?.user?.email) {
+      setIsAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    apiFetch<{ is_admin: boolean }>('/api/admin/me')
+      .then((res) => {
+        if (!cancelled) setIsAdmin(!!res.is_admin);
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.email]);
 
   useEffect(() => {
     // Detect embed mode synchronously, BEFORE any auth/redirect decisions.
@@ -221,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       session,
       loading,
+      isAdmin,
       authError,
       async signIn(email, password) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -235,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
       },
     }),
-    [session, loading, authError]
+    [session, loading, isAdmin, authError]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

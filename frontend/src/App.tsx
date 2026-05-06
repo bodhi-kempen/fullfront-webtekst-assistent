@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ToastProvider } from './components/Toast';
 import { AuthProvider } from './contexts/AuthContext';
+import { AdminPage } from './pages/Admin';
+import { AdminProjectPage } from './pages/AdminProject';
 import { DashboardPage } from './pages/Dashboard';
 import { InterviewPage } from './pages/Interview';
 import { LoginPage } from './pages/Login';
@@ -44,6 +46,22 @@ export function App() {
             element={
               <ProtectedRoute>
                 <ReviewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/projects/:id"
+            element={
+              <ProtectedRoute>
+                <AdminProjectPage />
               </ProtectedRoute>
             }
           />

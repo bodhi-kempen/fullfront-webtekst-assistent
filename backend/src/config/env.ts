@@ -41,11 +41,21 @@ function parseFrameAncestors(): string[] {
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
+function parseAdminEmails(): string[] {
+  const raw = process.env.ADMIN_EMAILS;
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
   corsOrigin: parseCorsOrigin(),
   frameAncestors: parseFrameAncestors(),
+  adminEmails: parseAdminEmails(),
   supabaseUrl: required('SUPABASE_URL'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',

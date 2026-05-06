@@ -6,6 +6,7 @@ import express from 'express';
 import { env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/error.js';
 import { frameEmbed } from './middleware/frame.js';
+import { adminRouter } from './routes/admin.js';
 import { contentRouter } from './routes/content.js';
 import { editingRouter } from './routes/editing.js';
 import { exportRouter } from './routes/export.js';
@@ -42,6 +43,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // API
+app.use('/api/admin', adminRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/projects/:id/interview', interviewRouter);
 app.use('/api/projects/:id/strategy', strategyRouter);
