@@ -212,10 +212,12 @@ const BASE_PAGES: Record<Archetype, BasePageDef[]> = {
     { page_type: 'contact',    title: 'Contact',     slug: 'contact',    rationale: 'Reserveren + adres + openingstijden.' },
   ],
   webshop: [
-    { page_type: 'home',       title: 'Home',         slug: '',                 rationale: 'Productselectie + waardepropositie.' },
-    { page_type: 'over',       title: 'Over ons',     slug: 'over',             rationale: 'Verhaal achter het merk, vertrouwen.' },
-    { page_type: 'faq',        title: 'Klantenservice', slug: 'klantenservice', rationale: 'Verzending, retouren, betaling, garantie.' },
-    { page_type: 'contact',    title: 'Contact',      slug: 'contact',          rationale: 'Vragen die niet onder klantenservice vallen.' },
+    { page_type: 'home',       title: 'Home',           slug: '',                 rationale: 'Productselectie + waardepropositie.' },
+    { page_type: 'diensten',   title: 'Shop',           slug: 'shop',             rationale: 'Productcategorieën of individuele producten met prijzen.' },
+    { page_type: 'over',       title: 'Over ons',       slug: 'over',             rationale: 'Verhaal achter het merk, vertrouwen.' },
+    { page_type: 'ervaringen', title: 'Reviews',        slug: 'reviews',          rationale: 'Klantbeoordelingen en foto\'s van het product in gebruik.' },
+    { page_type: 'faq',        title: 'Klantenservice', slug: 'klantenservice',   rationale: 'Verzending, retouren, betaling, garantie.' },
+    { page_type: 'contact',    title: 'Contact',        slug: 'contact',          rationale: 'Vragen die niet onder klantenservice vallen.' },
   ],
   boeking_gedreven: [
     { page_type: 'home',       title: 'Home',           slug: '',               rationale: 'Direct boeken + sfeer van de zaak.' },

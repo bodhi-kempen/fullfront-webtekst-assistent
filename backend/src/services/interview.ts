@@ -4,19 +4,24 @@ import {
   MAX_FOLLOWUPS_PER_PART,
   META_BLOG_OPTIN_ID,
   META_BLOG_OPTIN_TEXT,
+  modeFor,
   moreServicesId,
   PARTS,
   plannedId,
+  questionText,
   serviceQuestionId,
   type Archetype,
+  type BusinessMode,
   type Part,
 } from '../data/questions.js';
 import {
   classifyArchetype,
   classifyBlogOptin,
   classifyMoreServices,
+  classifyPagesAnswer,
   decideInterviewTurn,
   proposePagesQuestion,
+  refinePagesProposal,
   type PriorTurn,
 } from './interview-ai.js';
 
@@ -193,10 +198,21 @@ interface NextEmit {
   part: Part;
 }
 
+/** Mode-aware text for the "another service?" meta-question in DEEL 4. */
+function moreServicesText(mode: BusinessMode): string {
+  if (mode === 'product') {
+    return 'Heb je nog een ander product of een andere categorie om te bespreken? Zo ja, hoe heet die en wat houdt die in? Anders kun je gewoon "nee" antwoorden.';
+  }
+  if (mode === 'experience') {
+    return 'Heb je nog een andere ervaring of optie om te bespreken? Zo ja, hoe heet die en wat houdt die in? Anders kun je gewoon "nee" antwoorden.';
+  }
+  return 'Heb je nog een andere dienst om te bespreken? Zo ja, hoe heet hij en wat houdt hij in? Anders kun je gewoon "nee" antwoorden.';
+}
+
 /** Advance meta in place to the next thing to ask, and return its descriptor.
  *  Returns null when the interview is done. Handles part transitions, the
  *  part-4 service loop, and the meta-blog opt-in question between part 8 and 9. */
-function advanceMeta(meta: InterviewMeta): NextEmit | null {
+function advanceMeta(meta: InterviewMeta, mode: BusinessMode): NextEmit | null {
   // Helper to emit a planned question for a given part + question index.
   const emitPlanned = (part: Part, qIdx: number): NextEmit => {
     const def = PARTS[part];
@@ -204,7 +220,7 @@ function advanceMeta(meta: InterviewMeta): NextEmit | null {
     if (!q) throw new Error(`No question p${part}q${qIdx}`);
     return {
       question_id: plannedId(part, qIdx),
-      question_text: q.text,
+      question_text: questionText(q, mode),
       kind: 'planned',
       parent_id: null,
       part,
@@ -219,7 +235,7 @@ function advanceMeta(meta: InterviewMeta): NextEmit | null {
       if (!tmpl) throw new Error('part 4 template error');
       return {
         question_id: serviceQuestionId(meta.current_service, meta.current_service_q),
-        question_text: tmpl.text,
+        question_text: questionText(tmpl, mode),
         kind: 'planned',
         parent_id: null,
         part: 4,
@@ -229,8 +245,7 @@ function advanceMeta(meta: InterviewMeta): NextEmit | null {
       meta.current_service_q = 9;
       return {
         question_id: moreServicesId(meta.current_service),
-        question_text:
-          'Heb je nog een andere dienst om te bespreken? Zo ja, hoe heet hij en wat houdt hij in? Anders kun je gewoon "nee" antwoorden.',
+        question_text: moreServicesText(mode),
         kind: 'meta_more',
         parent_id: null,
         part: 4,
@@ -249,13 +264,13 @@ function advanceMeta(meta: InterviewMeta): NextEmit | null {
   }
 
   // Transition to next part
-  return transitionAfterPart(meta);
+  return transitionAfterPart(meta, mode);
 }
 
 /** Apply the part transition that should run after the LAST question of
  *  meta.current_part has just been answered. Mutates meta and returns the
  *  next thing to ask (or null when interview is complete). */
-function transitionAfterPart(meta: InterviewMeta): NextEmit | null {
+function transitionAfterPart(meta: InterviewMeta, mode: BusinessMode): NextEmit | null {
   switch (meta.current_part) {
     case 1:
     case 2:
@@ -268,7 +283,7 @@ function transitionAfterPart(meta: InterviewMeta): NextEmit | null {
         const tmpl = PARTS[4].questions[0]!;
         return {
           question_id: serviceQuestionId(1, 1),
-          question_text: tmpl.text,
+          question_text: questionText(tmpl, mode),
           kind: 'planned',
           parent_id: null,
           part: 4,
@@ -279,7 +294,7 @@ function transitionAfterPart(meta: InterviewMeta): NextEmit | null {
       const def = PARTS[next];
       return {
         question_id: plannedId(next, 1),
-        question_text: def.questions[0]!.text,
+        question_text: questionText(def.questions[0]!, mode),
         kind: 'planned',
         parent_id: null,
         part: next,
@@ -291,7 +306,7 @@ function transitionAfterPart(meta: InterviewMeta): NextEmit | null {
       meta.current_part_q = 1;
       return {
         question_id: plannedId(5, 1),
-        question_text: PARTS[5].questions[0]!.text,
+        question_text: questionText(PARTS[5].questions[0]!, mode),
         kind: 'planned',
         parent_id: null,
         part: 5,
@@ -304,7 +319,7 @@ function transitionAfterPart(meta: InterviewMeta): NextEmit | null {
       meta.current_part_q = 1;
       return {
         question_id: plannedId(next, 1),
-        question_text: PARTS[next].questions[0]!.text,
+        question_text: questionText(PARTS[next].questions[0]!, mode),
         kind: 'planned',
         parent_id: null,
         part: next,
@@ -324,7 +339,7 @@ function transitionAfterPart(meta: InterviewMeta): NextEmit | null {
       meta.current_part_q = 1;
       return {
         question_id: plannedId(10, 1),
-        question_text: PARTS[10].questions[0]!.text,
+        question_text: questionText(PARTS[10].questions[0]!, mode),
         kind: 'planned',
         parent_id: null,
         part: 10,
@@ -477,10 +492,11 @@ export async function getInterviewStep(projectId: string): Promise<InterviewStep
   if (!meta.pending && answers.length === 0) {
     meta.current_part = 1;
     meta.current_part_q = 1;
-    const first = PARTS[1].questions[0]!;
+    const mode = modeFor(project.archetype);
+    const first = questionText(PARTS[1].questions[0]!, mode);
     meta.pending = {
       question_id: plannedId(1, 1),
-      question_text: first.text,
+      question_text: first,
       kind: 'planned',
       parent_id: null,
       part: 1,
@@ -488,13 +504,13 @@ export async function getInterviewStep(projectId: string): Promise<InterviewStep
     await setMeta(projectId, meta);
     return {
       done: false,
-      assistant_message: `${WELCOME_MESSAGE}\n\n${first.text}`,
+      assistant_message: `${WELCOME_MESSAGE}\n\n${first}`,
       current_question: {
         question_id: meta.pending.question_id,
         parent_question_id: null,
         is_followup: false,
         part: 1,
-        text: first.text,
+        text: first,
       },
       progress: progressFor(meta, answers, project),
     };
@@ -605,13 +621,33 @@ export async function submitAnswer(
     return await handleMetaBlog(projectId, project, meta, answers, input.answer_text.trim());
   }
 
+  // ---- Iterative page proposal: keep refining p10q12 until the user agrees ----
+  // The pending question_id covers both the original p10q12 and any refinement
+  // followups (p10q12_followup_N). We treat the parent as p10q12 to detect.
+  const pendingParent =
+    pending.kind === 'planned' ? pending.question_id : pending.parent_id ?? pending.question_id;
+  if (pendingParent === 'p10q12') {
+    const refined = await maybeRefinePagesProposal(
+      projectId,
+      project,
+      meta,
+      answers,
+      pending,
+      input.answer_text.trim()
+    );
+    if (refined) return refined;
+    // Confirmed → fall through to advance.
+  }
+
   // ---- Run AI per-turn decision (planned / followup / extra) ----
+
+  const mode = modeFor(project.archetype);
 
   // Determine what the next planned question would be (without committing).
   const speculativeMeta: InterviewMeta = JSON.parse(JSON.stringify(meta));
   let nextCandidate: NextEmit | null;
   if (pending.kind === 'planned') {
-    nextCandidate = advanceMeta(speculativeMeta);
+    nextCandidate = advanceMeta(speculativeMeta, mode);
   } else {
     // followup / extra: the planned question is the parent's NEXT, which is
     // actually the same as advancing from current state (parent is the
@@ -619,7 +655,7 @@ export async function submitAnswer(
     // planned itself). For followup/extra, the "next planned" is whatever
     // would come after the parent. Easiest: speculatively advance from
     // current meta state — parent's index is already accounted for.
-    nextCandidate = advanceMeta(speculativeMeta);
+    nextCandidate = advanceMeta(speculativeMeta, mode);
   }
 
   // For followup count + recent context, use the parent question id.
@@ -645,6 +681,7 @@ export async function submitAnswer(
     nextPlannedText: nextCandidate?.kind === 'planned' ? nextCandidate.question_text : null,
     archetypeHints,
     priorAnswersSummary: priorAnswersSummary(answers),
+    mode,
   });
 
   return await applyDecision(projectId, project, meta, answers, pending, decision, nextCandidate);
@@ -664,6 +701,7 @@ async function applyDecision(
   nextCandidate: NextEmit | null
 ): Promise<InterviewStep> {
   const acknowledgement = decision.acknowledgement || 'Helder.';
+  const mode = modeFor(project.archetype);
 
   // Followup: the parent stays; emit the doorvraag.
   if (decision.action === 'followup' && decision.followup_question) {
@@ -732,7 +770,7 @@ async function applyDecision(
     // First advance commits skipping nextCandidate (already mutated meta if
     // we'd called advanceMeta; but nextCandidate came from a speculative
     // copy). Apply the same mutation on the real meta:
-    const skipped = advanceMeta(meta);
+    const skipped = advanceMeta(meta, mode);
     if (skipped && skipped.kind === 'meta_more') {
       // Skipping meta_more doesn't make sense; commit it and move on.
       meta.pending = skipped;
@@ -740,7 +778,7 @@ async function applyDecision(
       return emitFromCandidate(meta, answers, project, acknowledgement, skipped);
     }
     // Now advance once more for the actual next.
-    const afterRaw = advanceMeta(meta);
+    const afterRaw = advanceMeta(meta, mode);
     const after = await maybeReplacePagesQuestion(afterRaw, project, answers);
     if (!after) {
       meta.pending = null;
@@ -759,7 +797,7 @@ async function applyDecision(
   }
 
   // Advance: commit the speculative advance (re-run on the real meta).
-  const nextRaw = advanceMeta(meta);
+  const nextRaw = advanceMeta(meta, mode);
   const next = await maybeReplacePagesQuestion(nextRaw, project, answers);
   if (!next) {
     meta.pending = null;
@@ -775,6 +813,85 @@ async function applyDecision(
   meta.pending = next;
   await setMeta(projectId, meta);
   return emitFromCandidate(meta, answers, project, acknowledgement, next);
+}
+
+/** Iterative refinement of the p10q12 page proposal. When the user accepts
+ *  the proposal we return null and let the normal decision path advance.
+ *  When the user proposes a change (add/remove/rename/combine), we generate
+ *  a refined proposal and emit it as a followup so the user can confirm or
+ *  iterate again. Hard-capped at MAX_PAGE_REFINEMENTS to avoid loops. */
+const MAX_PAGE_REFINEMENTS = 3;
+
+async function maybeRefinePagesProposal(
+  projectId: string,
+  project: ProjectRow,
+  meta: InterviewMeta,
+  answers: AnswerRow[],
+  pending: PendingQuestion,
+  userAnswer: string
+): Promise<InterviewStep | null> {
+  // Count how many times we've already refined this proposal.
+  const refineCount = answers.filter(
+    (a) =>
+      a.parent_question_id === 'p10q12' &&
+      a.is_followup &&
+      /_followup_\d+$/.test(a.question_id)
+  ).length;
+
+  if (refineCount >= MAX_PAGE_REFINEMENTS) {
+    // Give up gracefully — accept whatever the user just said and advance.
+    console.warn(
+      `[interview] reached page-refinement cap (${MAX_PAGE_REFINEMENTS}); advancing anyway`
+    );
+    return null;
+  }
+
+  let confirmed = false;
+  try {
+    const cls = await classifyPagesAnswer(userAnswer);
+    confirmed = cls.confirmed;
+  } catch (err) {
+    console.error('[interview] page-answer classification failed; assuming confirmed', err);
+    return null;
+  }
+
+  if (confirmed) return null;
+
+  // User wants modifications — re-propose.
+  let refined: string;
+  try {
+    refined = await refinePagesProposal({
+      archetype: project.archetype,
+      previousProposal: pending.question_text,
+      userModification: userAnswer,
+      answersDigest: priorAnswersSummary(answers),
+    });
+  } catch (err) {
+    console.error('[interview] refine-pages failed; advancing without re-prompt', err);
+    return null;
+  }
+
+  const followupId = `p10q12_followup_${refineCount + 1}`;
+  meta.pending = {
+    question_id: followupId,
+    question_text: refined,
+    kind: 'followup',
+    parent_id: 'p10q12',
+    part: 10,
+  };
+  await setMeta(projectId, meta);
+  return {
+    done: false,
+    assistant_message: refined,
+    current_question: {
+      question_id: followupId,
+      parent_question_id: 'p10q12',
+      is_followup: true,
+      part: 10,
+      text: refined,
+    },
+    progress: progressFor(meta, answers, project),
+  };
 }
 
 /** If the next planned question is p10q12 ("Welke pagina's wil je?"), replace
@@ -843,13 +960,15 @@ async function handleMetaMore(
     console.error('[interview] more-services classification failed; assuming no.', err);
   }
 
+  const mode = modeFor(project.archetype);
+
   if (wantsMore) {
     meta.current_service += 1;
     meta.current_service_q = 1;
-    const tmpl = PARTS[4].questions[0]!;
+    const tmpl = questionText(PARTS[4].questions[0]!, mode);
     meta.pending = {
       question_id: serviceQuestionId(meta.current_service, 1),
-      question_text: tmpl.text,
+      question_text: tmpl,
       kind: 'planned',
       parent_id: null,
       part: 4,
@@ -857,13 +976,13 @@ async function handleMetaMore(
     await setMeta(projectId, meta);
     return {
       done: false,
-      assistant_message: `Helder, vertel.\n\n${tmpl.text}`,
+      assistant_message: `Helder, vertel.\n\n${tmpl}`,
       current_question: {
         question_id: meta.pending.question_id,
         parent_question_id: null,
         is_followup: false,
         part: 4,
-        text: tmpl.text,
+        text: tmpl,
       },
       progress: progressFor(meta, answers, project),
     };
@@ -872,10 +991,10 @@ async function handleMetaMore(
   // No more services — advance to part 5.
   meta.current_part = 5;
   meta.current_part_q = 1;
-  const first = PARTS[5].questions[0]!;
+  const first = questionText(PARTS[5].questions[0]!, mode);
   meta.pending = {
     question_id: plannedId(5, 1),
-    question_text: first.text,
+    question_text: first,
     kind: 'planned',
     parent_id: null,
     part: 5,
@@ -883,13 +1002,13 @@ async function handleMetaMore(
   await setMeta(projectId, meta);
   return {
     done: false,
-    assistant_message: `Helder, dan gaan we door.\n\n${first.text}`,
+    assistant_message: `Helder, dan gaan we door.\n\n${first}`,
     current_question: {
       question_id: meta.pending.question_id,
       parent_question_id: null,
       is_followup: false,
       part: 5,
-      text: first.text,
+      text: first,
     },
     progress: progressFor(meta, answers, project),
   };
@@ -913,10 +1032,11 @@ async function handleMetaBlog(
   const nextPart = (wantsBlog ? 9 : 10) as Part;
   meta.current_part = nextPart;
   meta.current_part_q = 1;
-  const first = PARTS[nextPart].questions[0]!;
+  const mode = modeFor(project.archetype);
+  const first = questionText(PARTS[nextPart].questions[0]!, mode);
   meta.pending = {
     question_id: plannedId(nextPart, 1),
-    question_text: first.text,
+    question_text: first,
     kind: 'planned',
     parent_id: null,
     part: nextPart,
@@ -925,14 +1045,14 @@ async function handleMetaBlog(
   return {
     done: false,
     assistant_message: wantsBlog
-      ? `Mooi, dan duiken we daar even in.\n\n${first.text}`
-      : `Helder, dan gaan we door naar de afsluiting.\n\n${first.text}`,
+      ? `Mooi, dan duiken we daar even in.\n\n${first}`
+      : `Helder, dan gaan we door naar de afsluiting.\n\n${first}`,
     current_question: {
       question_id: meta.pending.question_id,
       parent_question_id: null,
       is_followup: false,
       part: nextPart,
-      text: first.text,
+      text: first,
     },
     progress: progressFor(meta, answers, project),
   };

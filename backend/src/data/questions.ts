@@ -20,11 +20,38 @@ export type Archetype =
   | 'webshop'
   | 'boeking_gedreven';
 
+/** Coarser bucket per archetype. Drives mode-specific question wording so we
+ *  don't push "problem"-framing onto a product business or "service" framing
+ *  onto an experience venue. */
+export type BusinessMode = 'service' | 'product' | 'experience';
+
+export const MODE_BY_ARCHETYPE: Record<Archetype, BusinessMode> = {
+  service_zzp: 'service',
+  lokale_ambacht: 'service',
+  visueel_portfolio: 'service',
+  boeking_gedreven: 'service',
+  webshop: 'product',
+  horeca: 'experience',
+};
+
+export function modeFor(archetype: Archetype | null | undefined): BusinessMode {
+  // Default to 'service' before archetype is known — that's what the old
+  // wording assumed and the early questions are roughly mode-agnostic anyway.
+  return archetype ? MODE_BY_ARCHETYPE[archetype] : 'service';
+}
+
 export interface FixedQuestion {
   /** 1-based position within the part (excluding service-loop ordering). */
   index: number;
   text: string;
+  /** Optional per-mode overrides. If a mode is missing, falls back to `text`. */
+  text_by_mode?: Partial<Record<BusinessMode, string>>;
   goal?: string;
+}
+
+/** Resolve the actual question text for a given archetype/mode. */
+export function questionText(q: FixedQuestion, mode: BusinessMode): string {
+  return q.text_by_mode?.[mode] ?? q.text;
 }
 
 export interface PartDef {
@@ -71,17 +98,66 @@ export const PARTS: Record<Part, PartDef> = {
 
   2: {
     number: 2,
-    title: 'Het probleem van je klant',
-    goal: 'Pijnpunten voor hero, diensten-teksten, CTA\'s',
+    title: 'Het probleem, de behoefte of de aanleiding',
+    goal: 'Pijnpunten / wensen voor hero, diensten/producten-teksten, CTA\'s',
     max_followups: 2,
     questions: [
-      { index: 1, text: 'Welke problemen zie je bij klanten voordat ze bij jou komen?' },
-      { index: 2, text: 'Hoe uit zich dit probleem in de praktijk?' },
-      { index: 3, text: 'Wat hebben ze vaak al geprobeerd?' },
-      { index: 4, text: 'Waarom werkte dat niet?' },
-      { index: 5, text: 'Wat frustreert hen het meest?' },
-      { index: 6, text: 'Wat kost dit hen aan tijd, geld of energie?' },
-      { index: 7, text: 'Wat gebeurt er als ze niets doen?' },
+      {
+        index: 1,
+        text: 'Welke problemen zie je bij klanten voordat ze bij jou komen?',
+        text_by_mode: {
+          product: 'Wat is de aanleiding dat iemand jouw product zoekt? Welke behoefte of wens vervult het?',
+          experience: 'Wat zoeken mensen als ze bij jou komen? Welke ervaring willen ze hebben?',
+        },
+      },
+      {
+        index: 2,
+        text: 'Hoe uit zich dit probleem in de praktijk?',
+        text_by_mode: {
+          product: 'Hoe ziet die behoefte er in de praktijk uit?',
+          experience: 'In welke gelegenheid of stemming zoeken mensen jou op?',
+        },
+      },
+      {
+        index: 3,
+        text: 'Wat hebben ze vaak al geprobeerd?',
+        text_by_mode: {
+          product: 'Welke alternatieven hebben ze overwogen of al geprobeerd?',
+          experience: 'Welke alternatieven hadden ze nog meer kunnen kiezen?',
+        },
+      },
+      {
+        index: 4,
+        text: 'Waarom werkte dat niet?',
+        text_by_mode: {
+          product: 'Waarom voldeden die alternatieven niet?',
+          experience: 'Waarom voldeden die alternatieven niet?',
+        },
+      },
+      {
+        index: 5,
+        text: 'Wat frustreert hen het meest?',
+        text_by_mode: {
+          product: 'Wat missen ze het meest in andere producten?',
+          experience: 'Wat missen ze in andere ervaringen?',
+        },
+      },
+      {
+        index: 6,
+        text: 'Wat kost dit hen aan tijd, geld of energie?',
+        text_by_mode: {
+          product: 'Hoe ziet hun situatie eruit zonder jouw product? Wat missen ze dan?',
+          experience: 'Wat missen ze als ze deze ervaring niet hebben?',
+        },
+      },
+      {
+        index: 7,
+        text: 'Wat gebeurt er als ze niets doen?',
+        text_by_mode: {
+          product: 'Wat blijft er hangen als ze geen oplossing kiezen?',
+          experience: 'Wat zouden ze missen als ze niet kwamen?',
+        },
+      },
     ],
   },
 
@@ -117,8 +193,8 @@ export const PARTS: Record<Part, PartDef> = {
 
   4: {
     number: 4,
-    title: 'Diensten of aanbod',
-    goal: 'Diensten-teksten (homepage + verdiepingspagina). Vragen herhalen per dienst.',
+    title: 'Diensten, producten of aanbod',
+    goal: 'Diensten/producten-teksten (homepage + verdiepingspagina). Vragen herhalen per dienst of product.',
     max_followups: 2,
     is_per_service: true,
     archetype_hints: {
@@ -133,17 +209,59 @@ export const PARTS: Record<Part, PartDef> = {
       ],
       webshop: [
         'Hoe werken verzending en retouren bij dit product?',
+        'Heb je veel verschillende producten? Dan kunnen we beter de belangrijkste categorieën bespreken.',
+        'Is er een bestseller of favoriet?',
       ],
     },
     questions: [
-      { index: 1, text: 'Hoe heet deze dienst en wat houdt die in?' },
-      { index: 2, text: 'Waarom heb je deze dienst zo ingericht?' },
-      { index: 3, text: 'Voor wie is deze dienst bedoeld?' },
-      { index: 4, text: 'In welke situatie zit iemand dan?' },
-      { index: 5, text: 'Welk probleem lost deze dienst op?' },
-      { index: 6, text: 'Wat verandert er concreet?' },
-      { index: 7, text: 'Wat levert het op?' },
-      { index: 8, text: 'Wat merkt de klant als eerste?' },
+      {
+        index: 1,
+        text: 'Hoe heet deze dienst en wat houdt die in?',
+        text_by_mode: {
+          product: 'Hoe heet dit product (of deze categorie) en wat houdt het in? Noem ook de prijs als die er is.',
+          experience: 'Hoe heet deze ervaring of optie en wat houdt die in?',
+        },
+      },
+      {
+        index: 2,
+        text: 'Waarom heb je deze dienst zo ingericht?',
+        text_by_mode: {
+          product: 'Waarom heb je het zo gemaakt of samengesteld?',
+          experience: 'Waarom heb je het zo opgebouwd?',
+        },
+      },
+      {
+        index: 3,
+        text: 'Voor wie is deze dienst bedoeld?',
+        text_by_mode: {
+          product: 'Voor wie is dit product bedoeld?',
+          experience: 'Voor wie is dit bedoeld?',
+        },
+      },
+      {
+        index: 4,
+        text: 'In welke situatie zit iemand dan?',
+      },
+      {
+        index: 5,
+        text: 'Welk probleem lost deze dienst op?',
+        text_by_mode: {
+          product: 'Welke behoefte of wens vervult dit product?',
+          experience: 'Welke wens of gelegenheid vervult dit?',
+        },
+      },
+      {
+        index: 6,
+        text: 'Wat verandert er concreet?',
+      },
+      {
+        index: 7,
+        text: 'Wat levert het op?',
+      },
+      {
+        index: 8,
+        text: 'Wat merkt de klant als eerste?',
+      },
     ],
   },
 
@@ -199,7 +317,7 @@ export const PARTS: Record<Part, PartDef> = {
     max_followups: 2,
     questions: [
       { index: 1, text: 'Wat wil je betekenen voor je klanten?' },
-      { index: 2, text: 'Wat moeten ze aan jou overhouden?' },
+      { index: 2, text: 'Wat wil je dat klanten ervaren of onthouden?' },
       { index: 3, text: 'Waar wil je over 5 jaar staan?' },
       { index: 4, text: 'Wat is je grotere ambitie?' },
       { index: 5, text: 'Welke waarden zijn voor jou niet onderhandelbaar?' },
@@ -215,7 +333,14 @@ export const PARTS: Record<Part, PartDef> = {
     questions: [
       { index: 1, text: 'Welke vragen krijg je het vaakst van klanten?' },
       { index: 2, text: 'Wanneer stellen ze deze vragen?' },
-      { index: 3, text: 'Waar twijfelen mensen over voordat ze instappen?' },
+      {
+        index: 3,
+        text: 'Waar twijfelen mensen over voordat ze instappen?',
+        text_by_mode: {
+          product: 'Wat houdt mensen tegen om te kopen?',
+          experience: 'Wat houdt mensen tegen om te boeken of langs te komen?',
+        },
+      },
       { index: 4, text: 'Wat stellen ze vaak niet hardop?' },
       { index: 5, text: 'Welke misverstanden bestaan er over jouw werk?' },
     ],

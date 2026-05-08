@@ -1,5 +1,5 @@
 import { callTool } from '../lib/anthropic.js';
-import type { Archetype, Part } from '../data/questions.js';
+import type { Archetype, BusinessMode, Part } from '../data/questions.js';
 
 // ---------------------------------------------------------------------------
 // Per-turn decision: doorvragen, archetype-extra inserten, skippen, of
@@ -58,6 +58,21 @@ exacte tekst van die vraag; je hoeft hem niet te genereren.
   als "archetype", "value proposition" of "doelgroep-segment".
 - Niet napraten of samenvatten. Geen "Geweldig!" of "Bedankt voor je
   antwoord."
+
+## Bedrijfstype-bewustzijn
+Het bedrijf valt in één van drie modes (server vermeldt deze in de message):
+- service — dienstverlening (kapper, loodgieter, coach). "Probleem" is hier
+  natuurlijk en mag in doorvragen terugkomen.
+- product — webshop / fysiek product. "Probleem" is vaak NIET van toepassing.
+  Als de ondernemer zegt "er is geen probleem, het is gewoon mooi/leuk/lekker",
+  vraag dan NIET door naar problemen. Vraag in plaats daarvan naar:
+  aanleiding, behoefte, wens, situatie of waarde.
+- experience — locatie/ervaring (restaurant, hotel). Vraag naar gelegenheid,
+  sfeer, beleving — niet naar "het probleem".
+
+Als de mode niet "service" is en je per ongeluk een doorvraag formuleert die
+"probleem", "frustratie" of "pijn" bevat, kies dan in plaats daarvan
+"advance" of een neutralere doorvraag (behoefte, aanleiding, situatie).
 
 ## Output
 Gebruik altijd de respond-tool. Geen losse tekst.
@@ -127,6 +142,8 @@ export async function decideInterviewTurn(input: {
   archetypeHints: string[];
   /** Compact summary of all major answers so far, used for skip-detection. */
   priorAnswersSummary: string;
+  /** Drives mode-aware doorvraag style (service / product / experience). */
+  mode: BusinessMode;
 }): Promise<InterviewDecision> {
   const followupsLeft = input.maxFollowups - input.followupsAlreadyAsked;
 
@@ -141,6 +158,9 @@ export async function decideInterviewTurn(input: {
       : '(geen archetype-hints voor dit deel)';
 
   const userMessage = `
+## Bedrijfsmode
+${input.mode}
+
 ## Huidig deel
 DEEL ${input.part}
 
@@ -295,6 +315,90 @@ const YES_NO_TOOL = {
     additionalProperties: false,
   },
 };
+
+export async function classifyPagesAnswer(
+  answer: string
+): Promise<{ confirmed: boolean }> {
+  const result = await callTool<{ confirmed: boolean }>({
+    systemPrompt:
+      'Je krijgt een antwoord op een pagina-voorstel voor een website. ' +
+      'Antwoord confirmed=true als de gebruiker het voorstel accepteert ("ja", "klinkt goed", "prima", "akkoord", "perfect"). ' +
+      'Antwoord confirmed=false als de gebruiker iets wil toevoegen, weghalen, hernoemen of veranderen ("voeg X toe", "X mag weg", "geen Y", "andere naam", "X bij Y", "ik wil ook"). ' +
+      'Bij twijfel: false (laat de AI het voorstel opnieuw doen).',
+    messages: [{ role: 'user', content: `Antwoord: "${answer}"` }],
+    tool: {
+      name: 'classify_pages_answer',
+      description: 'Bepaal of de gebruiker het pagina-voorstel accepteert of wil aanpassen.',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          confirmed: {
+            type: 'boolean',
+            description:
+              'true bij acceptatie zonder wijzigingen; false als de gebruiker aanpassingen voorstelt.',
+          },
+        },
+        required: ['confirmed'],
+        additionalProperties: false,
+      },
+    },
+    maxTokens: 64,
+    purpose: 'interview/yesno-pages',
+  });
+  return result;
+}
+
+export async function refinePagesProposal(opts: {
+  archetype: Archetype | null;
+  previousProposal: string;
+  userModification: string;
+  answersDigest: string;
+}): Promise<string> {
+  const archetypeName = opts.archetype ?? 'onbekend archetype';
+
+  const system = `
+Je verfijnt een eerder pagina-voorstel op basis van een wijzigingsverzoek
+van de ondernemer. Output is opnieuw één korte assistant-message met de
+nieuwe pagina-lijst en een vraag of het zo akkoord is.
+
+## Regels
+- Pas EXACT aan wat de gebruiker vraagt. Voeg toe / verwijder / hernoem /
+  combineer secties zoals gevraagd. Niets extra erbij verzinnen.
+- Behoud de standaardstructuur waar de gebruiker geen wijziging op heeft
+  gevraagd (Home blijft staan, Contact blijft staan, enz.).
+- Schrijf in het Nederlands, "je"-vorm.
+- Bullets in markdown (-), na elke paginanaam een korte uitleg met
+  em-streep of haakjes. Maximaal 12 woorden.
+- Eindig met "Klinkt dat zo goed, of wil je nog iets aanpassen?".
+- Maximaal 7 pagina's.
+`.trim();
+
+  const user = `
+## Archetype
+${archetypeName}
+
+## Vorig voorstel (zoals jij dat hebt gegeven)
+${opts.previousProposal}
+
+## Wijzigingsverzoek van de ondernemer
+${opts.userModification}
+
+## Samenvatting van het interview (achtergrond)
+${opts.answersDigest}
+
+Geef nu het bijgestelde voorstel via de propose-tool.
+`.trim();
+
+  const out = await callTool<{ proposal_text: string }>({
+    systemPrompt: system,
+    messages: [{ role: 'user', content: user }],
+    tool: PAGE_PROPOSAL_TOOL,
+    maxTokens: 600,
+    purpose: 'interview/pages-refine',
+  });
+
+  return out.proposal_text.trim();
+}
 
 export async function classifyMoreServices(answer: string): Promise<boolean> {
   const result = await callTool<{ yes: boolean }>({
