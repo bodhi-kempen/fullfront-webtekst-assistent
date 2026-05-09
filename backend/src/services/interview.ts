@@ -605,18 +605,21 @@ export async function submitAnswer(
   });
 
   // Archetype detection happens AFTER we persist the current answer so the
-  // classifier sees DEEL 1 in full. Trigger when:
-  //   (a) we're answering the LAST planned DEEL 1 question — gives mode-aware
-  //       wording for p2q1 instead of letting it ship the service default, OR
-  //   (b) we're already past part 1 without an archetype set — backstop for
-  //       odd flows (skip_planned exhausting DEEL 1, etc.).
-  // Mutates project.archetype in place so the rest of submitAnswer picks up
-  // the new mode.
-  const isLastDeel1Answer =
-    pending.kind === 'planned' &&
-    pending.part === 1 &&
-    meta.current_part_q === PARTS[1].questions.length;
-  if (!project.archetype && (isLastDeel1Answer || pending.part > 1)) {
+  // classifier sees the full transcript so far. Trigger when:
+  //   (a) we have at least 5 main DEEL 1 answers — enough material to
+  //       classify reliably, and covers AI-skip flows that bypass p1q10
+  //       so the previous "last-question" check never fired, OR
+  //   (b) we're already past part 1 without an archetype — backstop for
+  //       any flow that exits DEEL 1 with fewer than 5 main answers.
+  // Mutates project.archetype in place so advanceMeta below picks up the
+  // new mode and emits p2q1 with product/experience wording when relevant.
+  const part1MainAnswers = answers.filter(
+    (a) => a.phase === 1 && !a.is_followup
+  );
+  if (
+    !project.archetype &&
+    (part1MainAnswers.length >= 5 || pending.part > 1)
+  ) {
     await classifyArchetypeWithFallback(projectId, project, answers);
   }
 
