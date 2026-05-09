@@ -61,9 +61,32 @@ voor webshops moet include_faq dus false zijn.
 - service_count: aantal kerndiensten op de homepage (max 3)
 
 ## NIET je taak
-De pagina-structuur (Home/Over/Diensten/etc) is vast per archetype. Je
-hoeft daar geen pagina's voor voor te stellen. Alleen blog en FAQ als
-opties.
+De pagina-structuur (Home/Over/Diensten/etc) is in principe vast per
+archetype. Je hoeft daar geen pagina's voor voor te stellen — server
+genereert ze uit BASE_PAGES.
+
+## WEL je taak (alleen bij wijzigingen)
+Tijdens DEEL 10 stelde de assistant zelf een pagina-lijst voor (vraag
+p10q12). Als de transcript laat zien dat de ondernemer dit voorstel
+heeft GEWIJZIGD (toevoegen, verwijderen, hernoemen, splitsen), reflecteer
+die wijzigingen dan in pages_override.
+
+Detectie: kijk naar de p10q12-sectie van de transcript. Als de gebruiker
+ALLEEN bevestigt ("ja", "klinkt goed", "prima") en het voorstel is
+gewoon de archetype-default → laat pages_override null. Als de gebruiker
+ZEGT iets als "voeg X toe", "Y mag weg", "X bij Y", "splitsen", "andere
+naam" → de finale geaccepteerde lijst (zoals zichtbaar in de laatste
+followup-tekst die de gebruiker bevestigde) komt in pages_override.
+
+Mapping naar page_type:
+- Home → 'home'
+- Over/Origin/Het verhaal → 'over'
+- Diensten/Behandelingen/Lessen/Menu/Shop/Producten/Portfolio → 'diensten'
+- Ervaringen/Reviews/Klantverhalen/Testimonials → 'ervaringen'
+- Contact/Reserveren/Boeken/Plan een afspraak → 'contact' (titel mag wel "Reserveren" zijn)
+- Blog/Inspiratie/Artikelen → 'blog'
+- FAQ/Veelgestelde vragen/Klantenservice → 'faq'
+- Iets dat nergens onder valt → 'custom'
 
 ## Output
 Gebruik altijd de propose-tool. Geen losse tekst.
@@ -107,6 +130,44 @@ const PROPOSE_TOOL = {
         ],
         additionalProperties: false,
       },
+      pages_override: {
+        type: ['array', 'null'],
+        description:
+          'Vul ALLEEN als de transcript laat zien dat de gebruiker het ' +
+          'voorgestelde pagina-overzicht (p10q12) wijzigde — toevoegen, ' +
+          'verwijderen, hernoemen of splitsen. Anders null laten; dan ' +
+          'gebruikt de server de standaard archetype-pagina-structuur. ' +
+          'De volgorde van het array bepaalt sort_order.',
+        items: {
+          type: 'object',
+          properties: {
+            page_type: {
+              type: 'string',
+              enum: [
+                'home',
+                'over',
+                'diensten',
+                'ervaringen',
+                'contact',
+                'blog',
+                'faq',
+                'custom',
+              ],
+            },
+            title: { type: 'string', description: "Pagina-titel zoals in de menu (bijv. 'Reserveren', 'Reviews')." },
+            slug: {
+              type: 'string',
+              description: "URL-slug, lowercase ASCII met '-' tussen woorden. Leeg ('') voor de Home.",
+            },
+            rationale: {
+              type: 'string',
+              description: 'Korte uitleg waarom deze pagina (max 1 zin).',
+            },
+          },
+          required: ['page_type', 'title', 'slug', 'rationale'],
+          additionalProperties: false,
+        },
+      },
     },
     required: [
       'website_type',
@@ -116,6 +177,7 @@ const PROPOSE_TOOL = {
       'include_blog',
       'include_faq',
       'archetype_config',
+      'pages_override',
     ],
     additionalProperties: false,
   },
@@ -153,6 +215,13 @@ export interface ArchetypeConfig {
   service_count: number;
 }
 
+interface PageOverrideEntry {
+  page_type: PageType;
+  title: string;
+  slug: string;
+  rationale: string;
+}
+
 interface AIDecision {
   website_type: 'lead_generation' | 'authority' | 'sales' | 'booking';
   tone_of_voice: string;
@@ -161,6 +230,7 @@ interface AIDecision {
   include_blog: boolean;
   include_faq: boolean;
   archetype_config: ArchetypeConfig;
+  pages_override: PageOverrideEntry[] | null;
 }
 
 export interface StrategyProposal {
@@ -232,6 +302,16 @@ function buildPagesList(
   archetype: Archetype,
   decision: AIDecision
 ): SuggestedPage[] {
+  // If the strategy AI saw user modifications to the page proposal, honor
+  // its override. We dedupe + ensure Home leads + force include=true so a
+  // mis-shaped AI response can't leave us with an empty or broken list.
+  const override = decision.pages_override;
+  if (override && override.length > 0) {
+    const cleaned = sanitizeOverridePages(override);
+    if (cleaned.length > 0) return cleaned;
+    console.warn('[strategy] pages_override was non-empty but sanitised to 0 — falling back to BASE_PAGES');
+  }
+
   const base = BASE_PAGES[archetype];
   const pages: SuggestedPage[] = base.map((p, i) => ({
     page_type: p.page_type,
@@ -269,6 +349,58 @@ function buildPagesList(
   }
 
   return pages;
+}
+
+/** Defensive cleanup of an AI-produced page list:
+ *  - dedupe identical slugs (keep first)
+ *  - dedupe duplicated page_type=home (keep first)
+ *  - ensure exactly one home, at index 0, with empty slug
+ *  - assign sort_order based on resulting array index
+ *  - drop entries with empty title
+ *  - normalize slug (lowercase ascii-ish; we trust the AI mostly here).
+ */
+function sanitizeOverridePages(rows: PageOverrideEntry[]): SuggestedPage[] {
+  const seenSlugs = new Set<string>();
+  let seenHome = false;
+  const result: SuggestedPage[] = [];
+
+  for (const row of rows) {
+    if (!row || !row.title || !row.title.trim()) continue;
+    let slug = (row.slug ?? '').trim().toLowerCase();
+    if (row.page_type === 'home') {
+      if (seenHome) continue;
+      seenHome = true;
+      slug = '';
+    }
+    if (slug !== '' && seenSlugs.has(slug)) continue;
+    seenSlugs.add(slug);
+    result.push({
+      page_type: row.page_type,
+      title: row.title.trim(),
+      slug,
+      sort_order: result.length,
+      include: true,
+      rationale: (row.rationale ?? '').trim() || `Door gebruiker bevestigde pagina.`,
+    });
+  }
+
+  // Move home to index 0 if it came later, or synthesize one if missing.
+  if (result.length === 0) return result;
+  const homeIdx = result.findIndex((p) => p.page_type === 'home');
+  if (homeIdx > 0) {
+    const [home] = result.splice(homeIdx, 1);
+    result.unshift(home!);
+  } else if (homeIdx === -1) {
+    result.unshift({
+      page_type: 'home',
+      title: 'Home',
+      slug: '',
+      sort_order: 0,
+      include: true,
+      rationale: 'Verplichte landingspagina.',
+    });
+  }
+  return result.map((p, i) => ({ ...p, sort_order: i }));
 }
 
 // ---------------------------------------------------------------------------
