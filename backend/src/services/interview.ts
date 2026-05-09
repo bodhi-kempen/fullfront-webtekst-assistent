@@ -575,14 +575,6 @@ export async function submitAnswer(
     );
   }
 
-  // Lazy archetype detection: if we somehow ended up past part 1 without an
-  // archetype (e.g., the AI used skip_planned during part 1 so the old
-  // ">= 10 mains answered" trigger never fired), classify NOW with retry +
-  // keyword fallback before processing this turn.
-  if (!project.archetype && meta.pending.part > 1) {
-    await classifyArchetypeWithFallback(projectId, project, answers);
-  }
-
   const pending = meta.pending;
 
   // Persist the answer for this turn.
@@ -611,6 +603,22 @@ export async function submitAnswer(
     parent_question_id: pending.parent_id,
     created_at: new Date().toISOString(),
   });
+
+  // Archetype detection happens AFTER we persist the current answer so the
+  // classifier sees DEEL 1 in full. Trigger when:
+  //   (a) we're answering the LAST planned DEEL 1 question — gives mode-aware
+  //       wording for p2q1 instead of letting it ship the service default, OR
+  //   (b) we're already past part 1 without an archetype set — backstop for
+  //       odd flows (skip_planned exhausting DEEL 1, etc.).
+  // Mutates project.archetype in place so the rest of submitAnswer picks up
+  // the new mode.
+  const isLastDeel1Answer =
+    pending.kind === 'planned' &&
+    pending.part === 1 &&
+    meta.current_part_q === PARTS[1].questions.length;
+  if (!project.archetype && (isLastDeel1Answer || pending.part > 1)) {
+    await classifyArchetypeWithFallback(projectId, project, answers);
+  }
 
   // ---- Branch on what the user just answered ----
 
