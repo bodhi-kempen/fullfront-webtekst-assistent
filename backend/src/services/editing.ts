@@ -460,7 +460,12 @@ export async function regenerateSection(
     throw Object.assign(new Error('Section not found'), { statusCode: 404 });
   }
 
+  // Mirror the fallback in generateOnePage: 'custom' page_type has no
+  // dedicated regenerator, so we route it through the over-page generator
+  // which produces a generic title/body/CTA layout.
+  const effectivePageType = pageType === 'custom' ? 'over' : pageType;
+
   const ctx = await buildCtx(projectId, userInstruction);
-  const fields = await buildFieldsForSection(ctx, pageType, section.section_type);
+  const fields = await buildFieldsForSection(ctx, effectivePageType, section.section_type);
   await replaceSectionContent(sectionId, fields);
 }
