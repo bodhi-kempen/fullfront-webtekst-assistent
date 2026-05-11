@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { assertProjectAccess } from '../lib/projectAccess.js';
 import { setProjectInContext } from '../lib/usage.js';
 import {
   approveStrategy,
@@ -15,19 +15,6 @@ export const strategyRouter = Router({ mergeParams: true });
 
 strategyRouter.use(requireAuth);
 
-async function assertOwner(projectId: string, userId: string): Promise<void> {
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) {
-    throw Object.assign(new Error('Project not found'), { statusCode: 404 });
-  }
-}
-
 function getId(req: { params: unknown }): string {
   return (req.params as { id: string }).id;
 }
@@ -36,7 +23,7 @@ function getId(req: { params: unknown }): string {
 strategyRouter.post('/generate', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     const strategy = await generateStrategy(projectId);
     res.json({ strategy });
@@ -49,7 +36,7 @@ strategyRouter.post('/generate', async (req, res, next) => {
 strategyRouter.get('/', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     const strategy = await getStrategy(projectId);
     if (!strategy) return res.status(404).json({ error: 'Strategy not yet generated' });
@@ -63,7 +50,7 @@ strategyRouter.get('/', async (req, res, next) => {
 strategyRouter.put('/', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     const updates = (req.body ?? {}) as StrategyUpdate;
     const strategy = await updateStrategy(projectId, updates);
@@ -77,7 +64,7 @@ strategyRouter.put('/', async (req, res, next) => {
 strategyRouter.post('/approve', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     const strategy = await approveStrategy(projectId);
     // Kick off content generation in the background. Server returns immediately.

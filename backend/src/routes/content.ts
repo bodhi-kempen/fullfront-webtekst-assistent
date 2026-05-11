@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { assertProjectAccess } from '../lib/projectAccess.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { setProjectInContext } from '../lib/usage.js';
 import {
@@ -11,19 +12,6 @@ export const contentRouter = Router({ mergeParams: true });
 
 contentRouter.use(requireAuth);
 
-async function assertOwner(projectId: string, userId: string): Promise<void> {
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) {
-    throw Object.assign(new Error('Project not found'), { statusCode: 404 });
-  }
-}
-
 function getId(req: { params: unknown }): string {
   return (req.params as { id: string }).id;
 }
@@ -32,7 +20,7 @@ function getId(req: { params: unknown }): string {
 contentRouter.post('/generate', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     startContentGeneration(projectId);
     res.json({ generating: true });
@@ -45,7 +33,7 @@ contentRouter.post('/generate', async (req, res, next) => {
 contentRouter.get('/pages', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
 
     const { data: project, error } = await supabaseAdmin
@@ -66,7 +54,7 @@ contentRouter.get('/pages', async (req, res, next) => {
 contentRouter.get('/pages/:page_id', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     const pages = await getPagesWithContent(projectId);
     const pageId = (req.params as { page_id: string }).page_id;

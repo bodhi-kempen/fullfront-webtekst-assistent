@@ -26,37 +26,6 @@ interface FieldRow {
 }
 
 // ---------------------------------------------------------------------------
-// Authorization helper — verify the section belongs to the given user via
-// page → project chain.
-// ---------------------------------------------------------------------------
-
-export async function assertSectionOwner(
-  sectionId: string,
-  userId: string
-): Promise<{ pageId: string; pageType: string; projectId: string }> {
-  const { data, error } = await supabaseAdmin
-    .from('sections')
-    .select('id, page_id, pages!inner(id, page_type, project_id, projects!inner(user_id))')
-    .eq('id', sectionId)
-    .maybeSingle();
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const row = data as any;
-  if (!row) {
-    throw Object.assign(new Error('Section not found'), { statusCode: 404 });
-  }
-  const projectUserId = row.pages?.projects?.user_id;
-  if (projectUserId !== userId) {
-    throw Object.assign(new Error('Section not found'), { statusCode: 404 });
-  }
-  return {
-    pageId: row.pages.id,
-    pageType: row.pages.page_type,
-    projectId: row.pages.project_id,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // PUT one field
 // ---------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { assertProjectAccess } from '../lib/projectAccess.js';
 import { loadExportDoc, loadExportPage } from '../services/export-render.js';
 import { renderDocAsDocx } from '../services/export-docx.js';
 import { renderDocAsPdf } from '../services/export-pdf.js';
@@ -9,19 +9,6 @@ import { renderPageAsText } from '../services/export-text.js';
 export const exportRouter = Router({ mergeParams: true });
 
 exportRouter.use(requireAuth);
-
-async function assertOwner(projectId: string, userId: string): Promise<void> {
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) {
-    throw Object.assign(new Error('Project not found'), { statusCode: 404 });
-  }
-}
 
 function getId(req: { params: unknown }): string {
   return (req.params as { id: string }).id;
@@ -43,7 +30,7 @@ function safeFilename(name: string): string {
 exportRouter.post('/word', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     const doc = await loadExportDoc(projectId);
     const buffer = await renderDocAsDocx(doc);
     const filename = `${safeFilename(doc.business_name)}-websiteteksten.docx`;
@@ -66,7 +53,7 @@ exportRouter.post('/word', async (req, res, next) => {
 exportRouter.post('/pdf', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     const doc = await loadExportDoc(projectId);
     const buffer = await renderDocAsPdf(doc);
     const filename = `${safeFilename(doc.business_name)}-websiteteksten.pdf`;
@@ -86,7 +73,7 @@ exportRouter.post('/pdf', async (req, res, next) => {
 exportRouter.get('/copy/:page_id', async (req, res, next) => {
   try {
     const projectId = getId(req);
-    await assertOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     const pageId = (req.params as { page_id: string }).page_id;
     const result = await loadExportPage(projectId, pageId);
     if (!result) return res.status(404).json({ error: 'Page not found' });

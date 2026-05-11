@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { assertSectionAccess } from '../lib/projectAccess.js';
 import { setProjectInContext } from '../lib/usage.js';
 import {
-  assertSectionOwner,
   regenerateSection,
   updateFieldValue,
 } from '../services/editing.js';
@@ -24,7 +24,7 @@ editingRouter.put('/:id/content/:field_id', async (req, res, next) => {
   try {
     const sectionId = req.params.id!;
     const fieldId = req.params.field_id!;
-    await assertSectionOwner(sectionId, req.user!.id);
+    await assertSectionAccess(sectionId, req.user!);
 
     const { value } = (req.body ?? {}) as { value?: string };
     if (typeof value !== 'string') {
@@ -43,7 +43,7 @@ editingRouter.put('/:id/content/:field_id', async (req, res, next) => {
 editingRouter.post('/:id/regenerate', async (req, res, next) => {
   try {
     const sectionId = req.params.id!;
-    const owner = await assertSectionOwner(sectionId, req.user!.id);
+    const owner = await assertSectionAccess(sectionId, req.user!);
     setProjectInContext(owner.projectId);
     await regenerateSection(sectionId, owner.pageType, owner.projectId);
     res.json({ ok: true });
@@ -58,7 +58,7 @@ editingRouter.post('/:id/regenerate', async (req, res, next) => {
 editingRouter.post('/:id/regenerate-with-prompt', async (req, res, next) => {
   try {
     const sectionId = req.params.id!;
-    const owner = await assertSectionOwner(sectionId, req.user!.id);
+    const owner = await assertSectionAccess(sectionId, req.user!);
     setProjectInContext(owner.projectId);
     const { instruction } = (req.body ?? {}) as { instruction?: string };
     if (typeof instruction !== 'string' || instruction.trim().length === 0) {

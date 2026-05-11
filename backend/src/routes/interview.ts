@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { assertProjectAccess } from '../lib/projectAccess.js';
 import { setProjectInContext } from '../lib/usage.js';
 import {
   getInterviewStep,
@@ -13,30 +13,11 @@ export const interviewRouter = Router({ mergeParams: true });
 
 interviewRouter.use(requireAuth);
 
-async function assertProjectOwner(
-  projectId: string,
-  userId: string
-): Promise<void> {
-  const { data, error } = await supabaseAdmin
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) {
-    const err = Object.assign(new Error('Project not found'), {
-      statusCode: 404,
-    });
-    throw err;
-  }
-}
-
 // POST /api/projects/:id/interview/start
 interviewRouter.post('/start', async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
-    await assertProjectOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     const step = await getInterviewStep(projectId);
     res.json(step);
@@ -49,7 +30,7 @@ interviewRouter.post('/start', async (req, res, next) => {
 interviewRouter.post('/answer', async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
-    await assertProjectOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
 
     const body = (req.body ?? {}) as Partial<SubmitAnswerInput>;
@@ -84,7 +65,7 @@ interviewRouter.post('/answer', async (req, res, next) => {
 interviewRouter.get('/status', async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
-    await assertProjectOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     const step = await getInterviewStep(projectId);
     res.json(step);
@@ -97,7 +78,7 @@ interviewRouter.get('/status', async (req, res, next) => {
 interviewRouter.post('/complete', async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
-    await assertProjectOwner(projectId, req.user!.id);
+    await assertProjectAccess(projectId, req.user!);
     setProjectInContext(projectId);
     await markInterviewComplete(projectId);
     res.json({ ok: true });

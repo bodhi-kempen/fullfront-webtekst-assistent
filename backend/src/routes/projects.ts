@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { assertProjectAccess } from '../lib/projectAccess.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 
 export const projectsRouter = Router();
@@ -45,19 +46,23 @@ projectsRouter.post('/', async (req, res, next) => {
   }
 });
 
-// GET /api/projects/:id
+// GET /api/projects/:id — admins can read any project, others only their own.
 projectsRouter.get('/:id', async (req, res, next) => {
   try {
+    await assertProjectAccess(req.params.id!, req.user!);
     const { data, error } = await supabaseAdmin
       .from('projects')
       .select('*')
       .eq('id', req.params.id)
-      .eq('user_id', req.user!.id)
       .maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Project not found' });
     res.json({ project: data });
   } catch (err) {
+    if (err && typeof err === 'object' && 'statusCode' in err) {
+      const e = err as Error & { statusCode: number };
+      return res.status(e.statusCode).json({ error: e.message });
+    }
     next(err);
   }
 });
@@ -65,6 +70,7 @@ projectsRouter.get('/:id', async (req, res, next) => {
 // PUT /api/projects/:id
 projectsRouter.put('/:id', async (req, res, next) => {
   try {
+    await assertProjectAccess(req.params.id!, req.user!);
     const allowed = ['name', 'business_name', 'language', 'status'] as const;
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
@@ -77,13 +83,16 @@ projectsRouter.put('/:id', async (req, res, next) => {
       .from('projects')
       .update(updates)
       .eq('id', req.params.id)
-      .eq('user_id', req.user!.id)
       .select()
       .maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Project not found' });
     res.json({ project: data });
   } catch (err) {
+    if (err && typeof err === 'object' && 'statusCode' in err) {
+      const e = err as Error & { statusCode: number };
+      return res.status(e.statusCode).json({ error: e.message });
+    }
     next(err);
   }
 });
