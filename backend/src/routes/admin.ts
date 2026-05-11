@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { isAdminEmail, requireAdmin } from '../middleware/admin.js';
 import { supabaseAdmin } from '../lib/supabase.js';
-import { getPagesWithContent } from '../services/content.js';
+import { getPagesWithContent, startContentGeneration } from '../services/content.js';
 import { getStrategy } from '../services/strategy.js';
+import { setProjectInContext } from '../lib/usage.js';
 
 // ---------------------------------------------------------------------------
 // CSV helpers — RFC 4180 escaping. UTF-8 BOM prefix so Excel auto-detects
@@ -338,6 +339,43 @@ adminRouter.get('/export/projects/:id/full.csv', async (req, res, next) => {
 
     const filename = `${safeFileName(project.name ?? 'project')}-full.csv`;
     sendCsv(res, filename, body);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Re-trigger content generation for any project. Used to recover projects
+// where generation crashed mid-flow and left status=strategy with a partial
+// page set. The worker wipes existing pages before regenerating so the
+// retry is idempotent regardless of how far the original run got.
+// ---------------------------------------------------------------------------
+adminRouter.post('/projects/:id/regenerate-content', async (req, res, next) => {
+  try {
+    const projectId = req.params.id!;
+
+    const { data: project, error } = await supabaseAdmin
+      .from('projects')
+      .select('id, user_id, name, status')
+      .eq('id', projectId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!project) return res.status(404).json({ error: 'Project niet gevonden' });
+
+    // Make usage logged against this project (admin's user_id stays in context).
+    setProjectInContext(projectId);
+
+    // Fire-and-forget — the worker reverts status on failure, just like the
+    // normal /strategy/approve path.
+    startContentGeneration(projectId);
+
+    res.json({
+      ok: true,
+      project_id: projectId,
+      project_name: project.name,
+      previous_status: project.status,
+      message: 'Content-generatie opnieuw gestart. Status wordt "generating"; poll het project om de voortgang te zien.',
+    });
   } catch (err) {
     next(err);
   }

@@ -5,9 +5,11 @@ import {
   Download,
   ExternalLink,
   LayoutDashboard,
+  RefreshCcw,
   ShieldCheck,
 } from 'lucide-react';
 import { AppShell, PageHeader } from '../components/AppShell';
+import { useToast } from '../components/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { apiDownload, apiFetch } from '../lib/api';
 
@@ -74,6 +76,7 @@ export function AdminProjectPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAdmin, loading: authLoading, adminLoading } = useAuth();
+  const toast = useToast();
   const [data, setData] = useState<AdminProjectResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,6 +166,19 @@ export function AdminProjectPage() {
       (err) => setError(err instanceof Error ? err.message : 'CSV-download mislukt')
     );
   }
+  async function regenerateContent() {
+    if (!window.confirm(
+      'Bestaande pagina\'s worden verwijderd en alle content opnieuw gegenereerd. Doorgaan?'
+    )) return;
+    try {
+      await apiFetch(`/api/admin/projects/${project.id}/regenerate-content`, {
+        method: 'POST',
+      });
+      toast.show('Content-generatie opnieuw gestart. Poll het project om de voortgang te zien.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kon content niet opnieuw genereren');
+    }
+  }
 
   return (
     <AppShell sidebar={sidebar}>
@@ -179,24 +195,34 @@ export function AdminProjectPage() {
           </>
         }
         right={
-          pages.length > 0 ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button type="button" className="btn btn-secondary btn-compact" onClick={downloadWord}>
-                <Download /> Word
-              </button>
-              <button type="button" className="btn btn-secondary btn-compact" onClick={downloadPdf}>
-                <Download /> PDF
-              </button>
-              <a
-                className="btn btn-secondary btn-compact"
-                href={`/review/${project.id}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink /> Open review
-              </a>
-            </div>
-          ) : null
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {pages.length > 0 && (
+              <>
+                <button type="button" className="btn btn-secondary btn-compact" onClick={downloadWord}>
+                  <Download /> Word
+                </button>
+                <button type="button" className="btn btn-secondary btn-compact" onClick={downloadPdf}>
+                  <Download /> PDF
+                </button>
+                <a
+                  className="btn btn-secondary btn-compact"
+                  href={`/review/${project.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink /> Open review
+                </a>
+              </>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary btn-compact"
+              onClick={regenerateContent}
+              title="Verwijder bestaande pagina's en genereer alle content opnieuw"
+            >
+              <RefreshCcw /> Regenereer content
+            </button>
+          </div>
         }
       />
 

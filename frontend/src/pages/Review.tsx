@@ -254,7 +254,12 @@ export function ReviewPage() {
     );
   }
 
-  if (pages.length === 0) {
+  // Halted-generation detection: the content worker reverts status to
+  // 'strategy' on failure (see backend/src/services/content.ts). If we land
+  // here with status=strategy, generation never finished — regardless of
+  // whether 0 pages or some pages got persisted before the crash.
+  const generationHalted = status === 'strategy';
+  if (generationHalted || pages.length === 0) {
     async function retry() {
       if (!projectId) return;
       try {
@@ -265,12 +270,22 @@ export function ReviewPage() {
         setError(err instanceof Error ? err.message : 'Kon niet opnieuw starten');
       }
     }
+    const partial = pages.length > 0;
     return (
       <AppShell sidebar={sidebar}>
         <div className="card card-padded">
           <div className="card-title">Teksten genereren is gestopt</div>
           <p className="muted">
-            Er ging iets mis tijdens het genereren. Geen pagina's opgeslagen. Probeer het opnieuw.
+            {partial ? (
+              <>
+                De generatie is halverwege onderbroken. We hebben{' '}
+                <strong>{pages.length}</strong> van de pagina's al gegenereerd,
+                de rest ontbreekt. Probeer opnieuw — bestaande pagina's worden
+                opnieuw aangemaakt, zodat alles in één samenhangende stijl blijft.
+              </>
+            ) : (
+              <>Er ging iets mis tijdens het genereren. Geen pagina's opgeslagen. Probeer het opnieuw.</>
+            )}
           </p>
           <div className="form-row mt-4">
             <button type="button" className="btn btn-primary" onClick={() => void retry()}>
