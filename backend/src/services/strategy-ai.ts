@@ -78,15 +78,17 @@ ZEGT iets als "voeg X toe", "Y mag weg", "X bij Y", "splitsen", "andere
 naam" → de finale geaccepteerde lijst (zoals zichtbaar in de laatste
 followup-tekst die de gebruiker bevestigde) komt in pages_override.
 
-Mapping naar page_type:
+Mapping naar page_type — kies ALTIJD een concrete type uit deze lijst,
+gebruik 'custom' NIET (de content-generator kan custom pagina's niet
+zelfstandig produceren; map alles naar het best passende concrete type):
 - Home → 'home'
-- Over/Origin/Het verhaal → 'over'
-- Diensten/Behandelingen/Lessen/Menu/Shop/Producten/Portfolio → 'diensten'
+- Over/Origin/Het verhaal/Hoe we werken/Onze aanpak/Werkwijze → 'over'
+- Diensten/Behandelingen/Lessen/Menu/Shop/Producten/Portfolio/Aanbod → 'diensten'
 - Ervaringen/Reviews/Klantverhalen/Testimonials → 'ervaringen'
 - Contact/Reserveren/Boeken/Plan een afspraak → 'contact' (titel mag wel "Reserveren" zijn)
 - Blog/Inspiratie/Artikelen → 'blog'
 - FAQ/Veelgestelde vragen/Klantenservice → 'faq'
-- Iets dat nergens onder valt → 'custom'
+- Twijfelgeval → kies 'over' als het over het bedrijf gaat, 'diensten' als het over het aanbod gaat
 
 ## Output
 Gebruik altijd de propose-tool. Geen losse tekst.
@@ -367,7 +369,19 @@ function sanitizeOverridePages(rows: PageOverrideEntry[]): SuggestedPage[] {
   for (const row of rows) {
     if (!row || !row.title || !row.title.trim()) continue;
     let slug = (row.slug ?? '').trim().toLowerCase();
-    if (row.page_type === 'home') {
+
+    // Force 'custom' → a concrete page_type. The content generator can't
+    // emit custom pages directly; pick 'over' as the safest default since
+    // most "Hoe we werken" / "Onze aanpak" style requests fit there.
+    let page_type: PageType = row.page_type;
+    if (page_type === 'custom') {
+      console.warn(
+        `[strategy] coercing custom page "${row.title}" to over (content gen can't handle custom)`
+      );
+      page_type = 'over';
+    }
+
+    if (page_type === 'home') {
       if (seenHome) continue;
       seenHome = true;
       slug = '';
@@ -375,7 +389,7 @@ function sanitizeOverridePages(rows: PageOverrideEntry[]): SuggestedPage[] {
     if (slug !== '' && seenSlugs.has(slug)) continue;
     seenSlugs.add(slug);
     result.push({
-      page_type: row.page_type,
+      page_type,
       title: row.title.trim(),
       slug,
       sort_order: result.length,

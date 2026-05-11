@@ -679,9 +679,15 @@ async function generateOnePage(
     case 'blog':       return buildBlogPageSections(ctx, page);
     case 'faq':        return buildFaqPageSections(ctx, page);
     case 'custom':
-      throw new Error(
-        `Refusing to generate page with legacy type 'custom' (title="${page.title}"). Re-run strategy.`
+      // 'custom' historically meant "no concrete page type" and was a hard
+      // error. Now we treat it as an over-page (title + generic body + CTA),
+      // which works for descriptive/process pages like "Hoe we werken". The
+      // strategy AI is also told NOT to emit 'custom' but if it slips through
+      // (or older strategies are re-generated) we recover gracefully.
+      console.warn(
+        `[content] custom page "${page.title}" → falling back to over-page generator`
       );
+      return buildOverPageSections(ctx, page);
   }
 }
 

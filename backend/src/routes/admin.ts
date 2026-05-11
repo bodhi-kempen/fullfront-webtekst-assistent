@@ -4,7 +4,7 @@ import { isAdminEmail, requireAdmin } from '../middleware/admin.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { getPagesWithContent, startContentGeneration } from '../services/content.js';
 import { getStrategy } from '../services/strategy.js';
-import { setProjectInContext } from '../lib/usage.js';
+import { withUsageContext } from '../lib/usage.js';
 
 // ---------------------------------------------------------------------------
 // CSV helpers — RFC 4180 escaping. UTF-8 BOM prefix so Excel auto-detects
@@ -362,12 +362,17 @@ adminRouter.post('/projects/:id/regenerate-content', async (req, res, next) => {
     if (error) throw error;
     if (!project) return res.status(404).json({ error: 'Project niet gevonden' });
 
-    // Make usage logged against this project (admin's user_id stays in context).
-    setProjectInContext(projectId);
-
-    // Fire-and-forget — the worker reverts status on failure, just like the
-    // normal /strategy/approve path.
-    startContentGeneration(projectId);
+    // Run the regeneration in a fresh usage context anchored to the OWNER,
+    // not the admin. Usage rows then aggregate under the same project + user
+    // as the original strategy/approve flow did. bypassBudget=true so an
+    // owner who already hit the per-user cap (which caused the original
+    // mid-flow crash for projects like Polderwerk) doesn't block recovery.
+    await withUsageContext(
+      { userId: project.user_id, projectId, bypassBudget: true },
+      async () => {
+        startContentGeneration(projectId);
+      }
+    );
 
     res.json({
       ok: true,

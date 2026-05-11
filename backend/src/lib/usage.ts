@@ -47,6 +47,8 @@ export function computeCostUsd(model: string, t: UsageTokens): number {
 interface UsageContext {
   userId: string;
   projectId: string | null;
+  /** Skip budget check (admin recovery flows). Usage is still logged. */
+  bypassBudget?: boolean;
 }
 
 const storage = new AsyncLocalStorage<UsageContext>();
@@ -91,6 +93,7 @@ export class BudgetExceededError extends Error {
 export async function assertWithinBudget(): Promise<void> {
   const ctx = storage.getStore();
   if (!ctx || env.maxUsageUsdPerUser <= 0) return;
+  if (ctx.bypassBudget) return;
 
   const { data, error } = await supabaseAdmin
     .from('claude_usage')
