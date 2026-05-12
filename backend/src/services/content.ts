@@ -299,29 +299,56 @@ function buildFooterFields(
     ),
   ];
 
-  // Navigation links — always include home + every active page
+  // Navigation links — always include home + every active page. We use the
+  // page's actual slug (not urlFor(page_type)) so pages with the same
+  // page_type but different slugs (e.g. two 'custom' pages, or two
+  // 'diensten' pages) each get the right URL — urlFor's page_type → slug
+  // map would otherwise collapse them to whichever came last.
   const navLinks: Array<{ label: string; url: string }> = [
     { label: 'Home', url: '/' },
   ];
   for (const p of activePagesFor(ctx)) {
     if (p.page_type === 'home') continue;
-    navLinks.push({ label: p.title, url: ctx.urlFor(p.page_type) });
+    const slug = p.slug?.trim();
+    navLinks.push({
+      label: p.title,
+      url: slug && slug.length > 0 ? `/${slug}` : '#',
+    });
   }
   navLinks.forEach((n, i) => {
     fields.push({ field_name: 'nav_label', field_value: n.label, field_type: 'text', sort_order: i });
     fields.push({ field_name: 'nav_url', field_value: n.url, field_type: 'url', sort_order: i });
   });
 
-  // Legal links from business_info.legal_pages_needed
+  // Legal links from business_info.legal_pages_needed. sort_order starts
+  // AFTER the nav block so legal entries land in their own group instead of
+  // sharing row indices with the menu — the review UI groups fields by
+  // sort_order, and mixing them produced rows like "Home + Privacyverklaring".
   const legalLabels: Record<'privacy' | 'terms' | 'cookies', string> = {
     privacy: 'Privacyverklaring',
     terms: 'Algemene voorwaarden',
     cookies: 'Cookieverklaring',
   };
+  const legalSlugs: Record<'privacy' | 'terms' | 'cookies', string> = {
+    privacy: 'privacy',
+    terms: 'algemene-voorwaarden',
+    cookies: 'cookies',
+  };
   const legal = business?.legal_pages_needed ?? ['privacy'];
+  const legalSortStart = navLinks.length;
   legal.forEach((key, i) => {
-    fields.push({ field_name: 'legal_label', field_value: legalLabels[key], field_type: 'text', sort_order: i });
-    fields.push({ field_name: 'legal_url', field_value: `/${key}`, field_type: 'url', sort_order: i });
+    fields.push({
+      field_name: 'legal_label',
+      field_value: legalLabels[key],
+      field_type: 'text',
+      sort_order: legalSortStart + i,
+    });
+    fields.push({
+      field_name: 'legal_url',
+      field_value: `/${legalSlugs[key]}`,
+      field_type: 'url',
+      sort_order: legalSortStart + i,
+    });
   });
 
   // NAWTE — only fields we actually have a value for
