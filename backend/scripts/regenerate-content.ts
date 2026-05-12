@@ -1,30 +1,30 @@
 /**
- * Re-trigger content generation for the Polderwerk Studio project.
+ * Re-trigger content generation for a stuck project.
  *
  * Bypasses the HTTP admin endpoint and calls startContentGeneration() directly
- * via the service-role-keyed Supabase client. That's the same function the
- * /api/admin/projects/:id/regenerate-content endpoint runs, just without
- * needing an admin bearer token in this shell context.
+ * via the service-role-keyed Supabase client. Same flow as
+ * /api/admin/projects/:id/regenerate-content but doesn't require an admin
+ * bearer token in this shell context.
  *
  * The worker wipes existing pages before regenerating (deleteExistingPages
- * inside generateAllContent), so this is idempotent — even though Home is
- * already in the DB, the run will wipe + rebuild the full set.
+ * inside generateAllContent), so this is idempotent — half-finished projects
+ * end up with a complete, coherent set.
  *
- * Run from backend/:
- *   API_URL=https://webtekst.fullfront.nl npx tsx scripts/regenerate-polderwerk.ts
+ * Run from backend/, pass the project id as the first arg:
+ *   npx tsx scripts/regenerate-content.ts <project_id>
  *
- * (API_URL is only used for the optional status-poll at the end. The actual
- *  regeneration runs against the same Supabase project regardless of
- *  API_URL, because content.ts uses supabaseAdmin from this script's
- *  environment — point your backend/.env at production Supabase.)
+ * Falls back to Polderwerk's id when no arg is given (kept for backwards
+ * compat with the original use case).
  */
 
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 import { startContentGeneration } from '../src/services/content.js';
+import { generateStrategy } from '../src/services/strategy.js';
 import { withUsageContext } from '../src/lib/usage.js';
 
-const PROJECT_ID = 'f5c64665-1545-4b62-a966-f8bd0ad20646';
+const POLDERWERK_ID = 'f5c64665-1545-4b62-a966-f8bd0ad20646';
+const PROJECT_ID = process.argv[2] ?? POLDERWERK_ID;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -42,7 +42,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log('  Regenerate content — Polderwerk Studio');
+  console.log('  Regenerate content');
   console.log(`  Project: ${PROJECT_ID}`);
   console.log('═══════════════════════════════════════════════════════════════\n');
 
@@ -68,14 +68,30 @@ async function main() {
     .eq('project_id', PROJECT_ID);
   console.log(`Pagina's vóór regeneratie: ${pagesBefore ?? 0}`);
 
-  console.log('\nKick startContentGeneration() (fire-and-forget; worker draait in achtergrond)…');
-  // Wrap in usage context so claude_usage gets owner_id + project_id rows
-  // for this regeneration too. bypassBudget=true because this is admin
-  // recovery — the user's lifetime cap is meant for runaway-cost
-  // protection, not to block a re-run we're explicitly authorizing.
+  // Some projects sit at status='strategy' because the strategy row was
+  // never created (strategy generation never started, or crashed). Check
+  // and generate it first if missing, so the content worker has something
+  // to read.
+  const { data: existingStrategy } = await admin
+    .from('website_strategy')
+    .select('id, approved')
+    .eq('project_id', PROJECT_ID)
+    .maybeSingle();
+
   await withUsageContext(
     { userId: before.user_id, projectId: PROJECT_ID, bypassBudget: true },
     async () => {
+      if (!existingStrategy) {
+        console.log('\nNo strategy row found — generating strategy first…');
+        await generateStrategy(PROJECT_ID);
+        console.log('✓ Strategy generated.');
+      } else {
+        console.log(
+          `\nStrategy exists (approved=${existingStrategy.approved}). Skipping strategy generation.`
+        );
+      }
+
+      console.log('\nKick startContentGeneration() (fire-and-forget)…');
       startContentGeneration(PROJECT_ID);
     }
   );
