@@ -20,8 +20,12 @@ export const ANTHROPIC_MODEL = env.anthropicModel;
 // 529 = Anthropic-specific "overloaded" status some endpoints surface.
 const TRANSIENT_HTTP_STATUSES = new Set([429, 500, 502, 503, 504, 529]);
 
-const MAX_RETRIES = 3; // → 4 total attempts
-const BASE_BACKOFF_MS = 1000; // attempt N waits BASE * 2^(N-1) plus jitter
+// 5 retries with exponential backoff (1, 2, 4, 8, 16s + jitter) → up to ~31s
+// of waiting before giving up. The 3-retry budget we shipped first was too
+// tight when Anthropic had multi-minute 529 overloads — half-finished
+// generations were the result. 31s rides through most spikes.
+const MAX_RETRIES = 5;
+const BASE_BACKOFF_MS = 1000;
 
 interface AnthropicErrorShape {
   status?: number;
