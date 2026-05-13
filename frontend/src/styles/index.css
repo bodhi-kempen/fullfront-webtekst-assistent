@@ -1055,6 +1055,16 @@ body.embed-mode .sidebar { display: none; }
 }
 .review-section__actions { display: flex; gap: 8px; }
 
+.empty-content-hint {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: #FFF7E5;
+  border: 1px solid #F2D27A;
+  color: #7A5300;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 /* ===================================================================
  * UTILITIES
  * ================================================================ */

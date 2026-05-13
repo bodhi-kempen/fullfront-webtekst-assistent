@@ -326,6 +326,14 @@ export function ReviewPage() {
           <button
             type="button"
             className="btn btn-secondary btn-compact"
+            onClick={() => void load()}
+            title="Herlaad pagina-content uit de database"
+          >
+            <RefreshCcw /> Vernieuw
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact"
             onClick={() => void downloadWord()}
           >
             <Download /> Word
@@ -431,6 +439,21 @@ export function ReviewPage() {
 // Section editor
 // ---------------------------------------------------------------------------
 
+/** Fields the AI is supposed to fill with substantive content. When the
+ *  generator silently returns an empty string for one of these, the review
+ *  UI used to just show a blank textarea labelled "TEKST" with no
+ *  explanation. The hint surfaces that and points the user at Hergenereer. */
+const CONTENT_FIELDS = new Set([
+  'body',
+  'intro',
+  'title',
+  'subtitle',
+  'description',
+  'item_quote',
+  'faq_answer',
+  'service_description',
+]);
+
 function SectionEditor({
   section,
   busy,
@@ -445,6 +468,20 @@ function SectionEditor({
   onOpenInstruction: () => void;
 }) {
   const grouped = groupFieldsByOrder(section.fields);
+
+  // Detect "AI returned empty content" cases. The wire/DB has the field
+  // (so 'Geen velden in deze sectie' won't fire), but its value is blank.
+  // We surface a hint so the user knows to regenerate rather than wondering
+  // why a textarea labelled TEKST is empty.
+  const emptyContentFields = section.fields.filter(
+    (f) => CONTENT_FIELDS.has(f.field_name) && (!f.field_value || f.field_value.trim().length === 0)
+  );
+  if (emptyContentFields.length > 0) {
+    console.warn(
+      `[review] section ${section.section_type} (${section.id}) has empty content fields: ` +
+        emptyContentFields.map((f) => f.field_name).join(', ')
+    );
+  }
 
   return (
     <section className="review-section" style={{ opacity: busy ? 0.6 : 1 }}>
@@ -471,6 +508,14 @@ function SectionEditor({
           </button>
         </div>
       </div>
+
+      {emptyContentFields.length > 0 && (
+        <div className="empty-content-hint">
+          {emptyContentFields.length === 1
+            ? `Het veld "${emptyContentFields[0]!.field_name}" is leeg. Klik "Hergenereer" om opnieuw te proberen.`
+            : `${emptyContentFields.length} velden zijn leeg. Klik "Hergenereer" om opnieuw te proberen.`}
+        </div>
+      )}
 
       {grouped.singles.map((f) => (
         <div key={f.id} className="form-group">
