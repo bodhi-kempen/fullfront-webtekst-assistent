@@ -283,9 +283,25 @@ const OVER_FULL_TOOL = {
   input_schema: {
     type: 'object' as const,
     properties: {
-      title: { type: 'string' },
-      intro: { type: 'string', description: 'Korte intro paragraaf, 2-3 zinnen.' },
-      body: { type: 'string', description: 'Hoofdtekst. Volledige Over-pagina (300-600 woorden).' },
+      title: {
+        type: 'string',
+        description: 'Pagina-titel, max ~8 woorden.',
+      },
+      intro: {
+        type: 'string',
+        description:
+          'KORT, 2-3 zinnen, max ~50 woorden. Hooks de lezer, vat NIET het ' +
+          'hele verhaal samen. De volledige inhoud hoort in body.',
+      },
+      body: {
+        type: 'string',
+        description:
+          'VERPLICHT EN NIET LEEG. De volledige Over-pagina volgens de gekozen ' +
+          'methode (300-600 woorden). Bevat alle stappen / paragrafen die in de ' +
+          'methode-instructies staan. Mag GEEN lege string zijn — als je twijfelt ' +
+          'over inhoud, vertel dan het verhaal zo goed mogelijk op basis van de ' +
+          'interview-antwoorden.',
+      },
       cta_text: { type: 'string', description: 'Max 5 woorden.' },
     },
     required: ['title', 'intro', 'body', 'cta_text'],
@@ -322,6 +338,21 @@ Per teamlid: naam, functie, specialiteiten, persoonlijke beschrijving (1 alinea 
 Je schrijft de Over-pagina. Doel: VERTROUWEN creëren. De WHY is belangrijker
 dan de WAT.
 
+## Veldverdeling — STRIKT (cruciaal)
+De write_over_full tool heeft 4 velden. Vul ALLE vier — vooral body is verplicht:
+- title: korte pagina-titel, max ~8 woorden.
+- intro: 2-3 zinnen die de lezer binnenhalen. Géén samenvatting van het
+  hele verhaal. Maximaal ~50 woorden.
+- body: het VOLLEDIGE verhaal volgens de methode-structuur hieronder.
+  Minimum 300 woorden, target 400-600 woorden, alle paragrafen uit de
+  methode. Dit veld mag NOOIT leeg zijn — als de body leeg blijft, faalt
+  de generatie. Schrijf eerder een korte body op basis van het interview
+  dan helemaal geen body.
+- cta_text: max 5 woorden, sluit aan op de primary CTA.
+
+Veel voorkomende fout: de methode-structuur in intro proppen en body leeg
+laten. Doe dat niet. Het hele methode-verhaal hoort in body.
+
 ${methodInstructions}
 
 ${styleBlock(ctx, { isFullPage: true })}
@@ -341,13 +372,54 @@ ${ans(ctx, 'p6q1', 'p6q2', 'p6q3', 'p6q4')}
 ${ans(ctx, 'p6q5', 'p6q6', 'p7q5', 'p7q6')}
 `.trim();
 
-  return callTool<OverFullOutput>({
+  const result = await callTool<OverFullOutput>({
     systemPrompt: system,
     messages: [{ role: 'user', content: user }],
     tool: OVER_FULL_TOOL,
-    maxTokens: 1536,
+    maxTokens: 2048,
     purpose: 'content/over-full',
   });
+
+  // Defensive: AI sometimes returns an empty body even though the prompt
+  // requires it. If we got back an empty/very-short body, retry ONCE with
+  // an extra reminder. This used to leave production projects with
+  // titled-but-empty Over pages.
+  const bodyTooShort = !result.body || result.body.trim().length < 200;
+  if (bodyTooShort) {
+    console.warn(
+      `[content/over-full] empty body returned (length=${result.body?.length ?? 0}); retrying once with explicit reminder`
+    );
+    const retry = await callTool<OverFullOutput>({
+      systemPrompt: system,
+      messages: [
+        { role: 'user', content: user },
+        {
+          role: 'assistant',
+          content:
+            'Vorige poging gaf een lege body. Ik schrijf nu een complete body ' +
+            'van 300-600 woorden volgens de methode-structuur.',
+        },
+        {
+          role: 'user',
+          content:
+            'Ja, geef nu het volledige verhaal in het body-veld. Body MAG NIET leeg ' +
+            'zijn — vul het met het volledige verhaal volgens de methode, ook al moet ' +
+            'je improviseren waar interview-antwoorden ontbreken.',
+        },
+      ],
+      tool: OVER_FULL_TOOL,
+      maxTokens: 2048,
+      purpose: 'content/over-full-retry',
+    });
+    if (retry.body && retry.body.trim().length > 100) {
+      return retry;
+    }
+    console.error(
+      `[content/over-full] retry still produced empty body (length=${retry.body?.length ?? 0})`
+    );
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
