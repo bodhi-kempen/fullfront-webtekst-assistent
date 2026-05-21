@@ -50,12 +50,25 @@ function parseAdminEmails(): string[] {
     .filter(Boolean);
 }
 
+function parseUnlimitedBudgetUsers(): string[] {
+  const raw = process.env.UNLIMITED_BUDGET_USERS;
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: Number(process.env.PORT ?? 4000),
   corsOrigin: parseCorsOrigin(),
   frameAncestors: parseFrameAncestors(),
   adminEmails: parseAdminEmails(),
+  // User ids that bypass the per-user spend cap entirely. Usage is still
+  // logged in claude_usage; only the budget gate is skipped. Set via
+  // UNLIMITED_BUDGET_USERS as a comma-separated list of UUIDs.
+  unlimitedBudgetUsers: parseUnlimitedBudgetUsers(),
   supabaseUrl: required('SUPABASE_URL'),
   supabaseServiceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',

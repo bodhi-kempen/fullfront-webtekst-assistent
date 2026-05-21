@@ -29,11 +29,20 @@ interface Progress {
   service_index?: number;
 }
 
+interface ChatTurn {
+  role: 'assistant' | 'user';
+  text: string;
+  question_id?: string;
+  is_followup?: boolean;
+}
+
 interface InterviewStep {
   done: boolean;
   assistant_message: string;
   current_question: CurrentQuestion | null;
   progress: Progress;
+  /** Present on /interview/start, used to restore the chat on page reload. */
+  history?: ChatTurn[];
 }
 
 interface ChatMessage {
@@ -80,7 +89,17 @@ export function InterviewPage() {
         );
         if (cancelled) return;
         setStep(s);
+        // Restore prior chat on page reload: server returns the answered
+        // turns chronologically, we append the current pending question as
+        // the last assistant bubble so the user resumes exactly where they
+        // left off.
+        const historicTurns: ChatMessage[] = (s.history ?? []).map((t) => ({
+          id: crypto.randomUUID(),
+          role: t.role,
+          text: t.text,
+        }));
         setChat([
+          ...historicTurns,
           { id: crypto.randomUUID(), role: 'assistant', text: s.assistant_message },
         ]);
       } catch (err) {

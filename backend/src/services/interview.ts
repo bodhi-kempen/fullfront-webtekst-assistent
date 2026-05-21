@@ -46,11 +46,27 @@ export interface InterviewProgress {
   service_index?: number;
 }
 
+export interface ChatTurn {
+  /** 'assistant' = AI vraag, 'user' = ondernemer's antwoord. */
+  role: 'assistant' | 'user';
+  text: string;
+  /** Question this turn relates to; empty for the welcome message. */
+  question_id?: string;
+  is_followup?: boolean;
+}
+
 export interface InterviewStep {
   done: boolean;
   assistant_message: string;
   current_question: CurrentQuestion | null;
   progress: InterviewProgress;
+  /** Prior conversation (answers in chronological order, each producing an
+   *  assistant + user pair). The current pending question is NOT included
+   *  here — the caller already has it in assistant_message. Only sent by
+   *  /interview/start, where the frontend uses it to restore the chat on
+   *  page reload. submitAnswer omits it because the client already has the
+   *  in-session messages in its own state. */
+  history?: ChatTurn[];
 }
 
 // ---------------------------------------------------------------------------
@@ -483,6 +499,29 @@ const WELCOME_MESSAGE =
 // Public: getInterviewStep (resume / poll)
 // ---------------------------------------------------------------------------
 
+/** Build chronological chat history from persisted answers. Each answer
+ *  contributed an assistant question + a user reply, so we emit both. The
+ *  current pending question is NOT included here — the caller adds it via
+ *  assistant_message. */
+function historyFromAnswers(answers: AnswerRow[]): ChatTurn[] {
+  const sorted = [...answers].sort((a, b) => a.sequence_order - b.sequence_order);
+  const turns: ChatTurn[] = [];
+  for (const a of sorted) {
+    turns.push({
+      role: 'assistant',
+      text: a.question_text,
+      question_id: a.question_id,
+      is_followup: a.is_followup,
+    });
+    turns.push({
+      role: 'user',
+      text: a.answer_text,
+      question_id: a.question_id,
+    });
+  }
+  return turns;
+}
+
 export async function getInterviewStep(projectId: string): Promise<InterviewStep> {
   const project = await loadProject(projectId);
   const answers = await loadAnswers(projectId);
@@ -513,6 +552,7 @@ export async function getInterviewStep(projectId: string): Promise<InterviewStep
         text: first,
       },
       progress: progressFor(meta, answers, project),
+      history: [],
     };
   }
 
@@ -529,6 +569,7 @@ export async function getInterviewStep(projectId: string): Promise<InterviewStep
         text: meta.pending.question_text,
       },
       progress: progressFor(meta, answers, project),
+      history: historyFromAnswers(answers),
     };
   }
 
@@ -538,6 +579,7 @@ export async function getInterviewStep(projectId: string): Promise<InterviewStep
     assistant_message: 'Het interview is voltooid. We kunnen door naar de strategie.',
     current_question: null,
     progress: progressFor(meta, answers, project),
+    history: historyFromAnswers(answers),
   };
 }
 

@@ -94,6 +94,9 @@ export async function assertWithinBudget(): Promise<void> {
   const ctx = storage.getStore();
   if (!ctx || env.maxUsageUsdPerUser <= 0) return;
   if (ctx.bypassBudget) return;
+  // UNLIMITED_BUDGET_USERS list — Fullfront's own staff/internal users get
+  // unlimited spend; everyone else stays gated by maxUsageUsdPerUser.
+  if (env.unlimitedBudgetUsers.includes(ctx.userId)) return;
 
   const { data, error } = await supabaseAdmin
     .from('claude_usage')
