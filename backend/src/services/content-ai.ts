@@ -96,6 +96,43 @@ function servicesBlock(ctx: GenContext): string {
   return blocks.join('\n\n');
 }
 
+/** Guardrails included in every content generator's system prompt.
+ *  Prevents hallucinated names, fabricated facts, and silent fill-ins of
+ *  missing information. Things the AI MUST NOT do — and what to do instead
+ *  when the interview hasn't given us the answer. */
+function accuracyBlock(ctx: GenContext): string {
+  const businessName = ctx.business_name ?? '(geen bedrijfsnaam bekend)';
+  return `
+## FEITELIJKE NAUWKEURIGHEID — STRIKT
+
+### Namen
+Gebruik UITSLUITEND namen die LETTERLIJK in het interview of de strategie
+voorkomen. Verzin NOOIT een persoonsnaam (geen Sophie, Eva, Mila, Lisa, etc.).
+Als de naam van de ondernemer niet bekend is, gebruik dan de bedrijfsnaam
+("${businessName}") of een neutrale formulering ("een afspraak bij ${businessName}",
+"het team van ${businessName}"). LIEVER GEEN NAAM dan een verzonnen naam.
+
+### Zekerheid behouden
+Behoud de mate van zekerheid uit het interview. Als de ondernemer
+"misschien", "ik denk", "ik ben aan het onderzoeken", "ik ben ermee bezig"
+of een vergelijkbare voorwaardelijke vorm gebruikte, blijft dat in de tekst
+een plan of mogelijkheid — NOOIT een vaststaand feit. "Ik wil ooit een
+tweede vestiging openen" wordt nooit "We hebben een tweede vestiging".
+
+### Placeholders bij ontbrekende info
+Als belangrijke informatie ontbreekt (plaatsnaam, telefoonnummer, prijzen,
+adres, openingstijden) vul je het gat NIET op met een vage formulering of
+verzonnen inhoud. Gebruik in plaats daarvan letterlijk:
+"[INVULLEN: korte omschrijving van wat hier hoort]"
+zodat het opvalt en niet ongemerkt live gaat. Voorbeelden:
+- "[INVULLEN: prijs vanaf]"
+- "[INVULLEN: plaatsnaam]"
+- "[INVULLEN: telefoonnummer]"
+NIET "Vraag naar onze prijzen" of "in onze regio" als trucje om een gat
+te verbergen.
+`.trim();
+}
+
 function styleBlock(ctx: GenContext, opts?: { isFullPage?: boolean }): string {
   return `
 ## Schrijfstijl
@@ -182,6 +219,8 @@ Je schrijft de hero-sectie van een homepage volgens het Fullfront hulpdocument.
 De cta_text is de website-brede primaire CTA: "${ctx.primary_cta}".
 Gebruik die letterlijk, of een kortere variant van max 4 woorden.
 
+${accuracyBlock(ctx)}
+
 ${styleBlock(ctx)}
 `.trim();
 
@@ -246,6 +285,8 @@ Verhalend, geen opsommingen.
 De cta_text leidt naar de Over-pagina, NIET naar contact. Gebruik
 "Meer over [voornaam]", "Leer [voornaam] kennen", "Lees mijn verhaal" of
 een vergelijkbare zachte variant. Max 5 woorden.
+
+${accuracyBlock(ctx)}
 
 ${styleBlock(ctx)}
 `.trim();
@@ -354,6 +395,8 @@ Veel voorkomende fout: de methode-structuur in intro proppen en body leeg
 laten. Doe dat niet. Het hele methode-verhaal hoort in body.
 
 ${methodInstructions}
+
+${accuracyBlock(ctx)}
 
 ${styleBlock(ctx, { isFullPage: true })}
 `.trim();
@@ -505,6 +548,8 @@ Je schrijft de diensten/producten sectie volgens het Fullfront hulpdocument.
 ## STRIKTE REGEL — verzin geen diensten
 Werk UITSLUITEND met de diensten die de ondernemer in het interview noemde.
 Verzin geen extra diensten, ook niet als het er minder zijn dan ${options.count}.
+Het werkelijke aantal beschreven diensten gaat ALTIJD boven de service_count
+uit de config — beschrijf alleen wat de ondernemer echt heeft toegelicht.
 ${
   options.isFullPage
     ? 'Gebruik ALLE diensten die de ondernemer noemde, niet meer en niet minder.'
@@ -512,6 +557,18 @@ ${
 }
 Thema's of stijlen die binnen een bestaande dienst vallen zijn GEEN aparte
 dienst. Twijfel je? Dan is het geen aparte dienst.
+
+## PRIJZEN
+show_pricing = ${ctx.archetype_config.show_pricing ? 'true' : 'false'}.
+${
+  ctx.archetype_config.show_pricing
+    ? `Als de ondernemer een concrete prijs of prijsindicatie noemde bij een dienst, ` +
+      `verwerk die ALTIJD zichtbaar in de omschrijving (bijv. "Vanaf €39" of "€110 per behandeling"). ` +
+      `Laat opgegeven prijzen NOOIT weg. Ontbreekt de prijs voor een dienst terwijl ` +
+      `show_pricing true is, gebruik dan letterlijk "[INVULLEN: prijs vanaf]" — ` +
+      `niet "vraag naar onze prijzen" of "in overleg" als verhullend trucje.`
+    : `Prijzen worden niet getoond op deze website. Laat prijzen uit de omschrijving weg.`
+}
 
 ## Stijl per item (archetype: ${ctx.archetype})
 ${styleByArchetype[ctx.archetype]}
@@ -521,6 +578,8 @@ ${styleByArchetype[ctx.archetype]}
 - Subtitel = max 15 woorden, concreter wat het is
 - Omschrijving = ${options.isFullPage ? '80-130 woorden' : '40-60 woorden'}, per archetype-stijl
 - CTA = max 5 woorden, past bij de gebruiks-context (homepage soft, pagina meer richting actie)
+
+${accuracyBlock(ctx)}
 
 ${styleBlock(ctx, { isFullPage: options.isFullPage })}
 `.trim();
@@ -635,21 +694,48 @@ ${options.count} items.
 ## Stijl per item (archetype: ${ctx.archetype})
 ${styleByArchetype[ctx.archetype]}
 
-## Regels
-- Echte quotes gebruiken als die in het interview staan; anders realistisch genereren.
-- Vermijd clichés ("super tevreden", "aanrader").
-- Quote-lengte: ${options.isFullPage ? '80-120 woorden per quote' : '40-80 woorden per quote'}.
+## TESTIMONIALS — STRIKTE POLICY (cruciaal)
 
-## VERPLICHT per item
-- title: kort (3-7 woorden), pakkende koptekst die de transformatie of
-  kern van de ervaring vat. Voorbeeld: "Van ziekmelding naar regie",
-  "Eindelijk zicht op mijn financiën".
-- subtitle: ALTIJD een naam + context. Format: "[Voornaam], [leeftijd] jaar"
-  of "[Functie], [plaats]" of "[Voornaam], [beroep]". Voorbeelden:
-  "Lisa, 38 jaar", "Teamleider in de zorg, Amsterdam", "Mark, ondernemer".
-  Een lege subtitle is ONTOELAATBAAR — verzin een geloofwaardige
-  context als die niet uit het interview komt.
-- quote: de daadwerkelijke ervaring, in de eerste persoon.
+Genereer ALLEEN testimonials op basis van quotes, verhalen of voorbeelden
+die de ondernemer zelf in het interview heeft aangeleverd.
+
+Verzin NOOIT:
+- Klantnamen (geen Lisa, Sophie, Mark, Sandra, etc. uit eigen koker)
+- Leeftijden ("38 jaar", "begin vijftig")
+- Beroepen of woonplaatsen die niet in het interview stonden
+- Quotes ("Ze waren super behulpzaam...")
+
+### Hoe je items vult per geval
+
+CASE A — Ondernemer leverde een concrete quote of casus aan.
+Gebruik die letterlijk of bijna letterlijk. Behoud de naam en context exact
+zoals genoemd. Eén casus = één item.
+
+CASE B — Ondernemer noemde wel klanten / aantallen / sterren maar geen
+specifieke quotes.
+Gebruik dat aantal of sterren in de intro, en zet voor elk item:
+- title: korte placeholder, bijv. "Ervaring 1"
+- subtitle: "[INVULLEN: naam + context, bijv. Lisa, 38 jaar of Teamleider in Amsterdam]"
+- quote: "[INVULLEN: echte klantquote — vraag een vaste klant om een review
+  van 40-80 woorden]"
+
+CASE C — Ondernemer zei "nee" / "nog geen klantverhalen" / "ik ben net begonnen".
+Vul de hele set als placeholders zoals in CASE B, met intro:
+"De eerste klantervaringen volgen binnenkort." Voeg deze notitie als
+title van het EERSTE item toe:
+"[NOTITIE VOOR ONDERNEMER: Vul hier echte klantervaringen in. Verzonnen
+reviews zijn juridisch en reputationeel riskant.]"
+
+### Quote-lengte
+${options.isFullPage ? '80-120 woorden per echte quote' : '40-80 woorden per echte quote'}.
+Placeholders blijven kort — alleen de invul-instructie tussen [INVULLEN: ...].
+
+### Consistentie tussen pagina's
+Eén set klantverhalen telt voor de hele website. Gebruik EXACT dezelfde
+namen en quotes overal waar testimonials voorkomen. Verzin niet per
+pagina nieuwe varianten.
+
+${accuracyBlock(ctx)}
 
 ${styleBlock(ctx, { isFullPage: options.isFullPage })}
 `.trim();
@@ -720,6 +806,8 @@ beschrijvende titel ("E-book over burn-out") is GEEN killer koptekst.
 Specifiek voor lead-magnets: "Download nu", "Verkrijg toegang",
 "Stuur 'm op", "Meld je aan". NIET de website-brede primaire CTA.
 
+${accuracyBlock(ctx)}
+
 ${styleBlock(ctx)}
 `.trim();
 
@@ -769,6 +857,8 @@ export async function generateFooter(ctx: GenContext): Promise<FooterOutput> {
   const system = `
 Je schrijft de footer-bedrijfsomschrijving (max 30 woorden).
 Eén compacte zin die zegt: wie ben je, wat doe je, voor wie, in welke regio.
+
+${accuracyBlock(ctx)}
 
 ${styleBlock(ctx)}
 `.trim();
@@ -869,6 +959,8 @@ ${intros[ctx.archetype]}
 ${fieldsByArchetype[ctx.archetype].join(', ')}
 Pas aan op basis van het interview als nodig (bijv. type contactvoorkeur uit q10).
 
+${accuracyBlock(ctx)}
+
 ${styleBlock(ctx, { isFullPage: true })}
 `.trim();
 
@@ -931,6 +1023,8 @@ export async function generateBlogPage(ctx: GenContext): Promise<BlogOutput> {
 Je schrijft de teksten voor de blog overzichtspagina.
 Weinig tekst nodig: blogposts zelf vullen de pagina. Focus op een goede
 intro en een zijbalk-bio van 40-50 woorden (niet korter).
+
+${accuracyBlock(ctx)}
 
 ${styleBlock(ctx, { isFullPage: true })}
 `.trim();
@@ -1032,6 +1126,8 @@ ${titleSuggest}
 - Concreet, geen vaagheid.
 - 40-100 woorden per antwoord.
 - Eindig waar passend met een verwijzing of CTA.
+
+${accuracyBlock(ctx)}
 
 ${styleBlock(ctx, { isFullPage: true })}
 `.trim();
