@@ -59,6 +59,7 @@ export function ReviewPage() {
   const [pages, setPages] = useState<Page[] | null>(null);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [lastContentError, setLastContentError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busySections, setBusySections] = useState<Set<string>>(new Set());
   const [instructionModalSection, setInstructionModalSection] = useState<string | null>(null);
@@ -67,10 +68,13 @@ export function ReviewPage() {
   const load = useCallback(async () => {
     if (!projectId) return;
     try {
-      const res = await apiFetch<{ status: string | null; pages: Page[] }>(
-        `/api/projects/${projectId}/pages`
-      );
+      const res = await apiFetch<{
+        status: string | null;
+        last_content_error: string | null;
+        pages: Page[];
+      }>(`/api/projects/${projectId}/pages`);
       setStatus(res.status);
+      setLastContentError(res.last_content_error ?? null);
       setPages(res.pages);
       setActivePageId((cur) => cur ?? res.pages[0]?.id ?? null);
     } catch (err) {
@@ -287,6 +291,27 @@ export function ReviewPage() {
               <>Er ging iets mis tijdens het genereren. Geen pagina's opgeslagen. Probeer het opnieuw.</>
             )}
           </p>
+          {lastContentError && (
+            <details className="mt-4">
+              <summary className="muted" style={{ cursor: 'pointer', fontSize: 13 }}>
+                Technische details (voor support)
+              </summary>
+              <pre
+                style={{
+                  marginTop: 8,
+                  padding: 10,
+                  background: 'var(--surface2)',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  color: 'var(--text-sec)',
+                }}
+              >
+                {lastContentError}
+              </pre>
+            </details>
+          )}
           <div className="form-row mt-4">
             <button type="button" className="btn btn-primary" onClick={() => void retry()}>
               Opnieuw genereren

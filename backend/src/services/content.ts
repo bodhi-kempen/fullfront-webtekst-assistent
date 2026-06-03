@@ -652,6 +652,17 @@ async function setStatus(projectId: string, status: string): Promise<void> {
   if (error) throw error;
 }
 
+async function setLastContentError(
+  projectId: string,
+  message: string | null
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('projects')
+    .update({ last_content_error: message })
+    .eq('id', projectId);
+  if (error) console.error('[content] could not persist last_content_error:', error);
+}
+
 // ---------------------------------------------------------------------------
 // Orchestration
 // ---------------------------------------------------------------------------
@@ -720,6 +731,9 @@ async function generateOnePage(
 
 export async function generateAllContent(projectId: string): Promise<void> {
   await setStatus(projectId, 'generating');
+  // Clear any error left over from a previous failed run. If THIS run also
+  // fails, the catch in startContentGeneration writes a fresh message.
+  await setLastContentError(projectId, null);
 
   const { ctx, strategy } = await buildContextFor(projectId);
   await deleteExistingPages(projectId);
@@ -759,10 +773,17 @@ export async function generateAllContent(projectId: string): Promise<void> {
 export function startContentGeneration(projectId: string): void {
   void generateAllContent(projectId).catch(async (err) => {
     console.error(`[content] generation failed for ${projectId}:`, err);
+    // Surface the failure on the project row so the user (and the admin
+    // UI) can see WHY their generation halted, not just that it did. We
+    // truncate to a reasonable length to avoid blowing up the column on
+    // huge stack traces from Anthropic API errors.
+    const rawMessage = err instanceof Error ? err.message : String(err);
+    const message = rawMessage.length > 800 ? rawMessage.slice(0, 800) + '…' : rawMessage;
     try {
+      await setLastContentError(projectId, message);
       await setStatus(projectId, 'strategy');
     } catch (revErr) {
-      console.error('[content] failed to revert status:', revErr);
+      console.error('[content] failed to revert status / persist error:', revErr);
     }
   });
 }

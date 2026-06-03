@@ -38,13 +38,17 @@ contentRouter.get('/pages', async (req, res, next) => {
 
     const { data: project, error } = await supabaseAdmin
       .from('projects')
-      .select('status')
+      .select('status, last_content_error')
       .eq('id', projectId)
       .maybeSingle();
     if (error) throw error;
 
     const pages = await getPagesWithContent(projectId);
-    res.json({ status: project?.status ?? null, pages });
+    res.json({
+      status: project?.status ?? null,
+      last_content_error: project?.last_content_error ?? null,
+      pages,
+    });
   } catch (err) {
     next(err);
   }

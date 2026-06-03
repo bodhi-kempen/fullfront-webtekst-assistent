@@ -65,6 +65,7 @@ interface AdminProjectResponse {
     status: string;
     created_at: string;
     business_name: string | null;
+    last_content_error: string | null;
   };
   answers: AnswerRow[];
   strategy: unknown;
@@ -225,6 +226,35 @@ export function AdminProjectPage() {
           </div>
         }
       />
+
+      {project.last_content_error && (
+        <div
+          className="card mt-4"
+          style={{ borderColor: 'var(--danger)', background: '#FEF2F2' }}
+        >
+          <div className="card-title" style={{ color: 'var(--danger)' }}>
+            Laatste content-generatie fout
+          </div>
+          <p className="muted" style={{ marginBottom: 8 }}>
+            De vorige generatie- of regeneratie-poging is gestopt met onderstaande
+            fout. Klik op "Regenereer content" om het opnieuw te proberen.
+          </p>
+          <pre
+            style={{
+              padding: 10,
+              background: 'var(--surface)',
+              borderRadius: 6,
+              fontSize: 12,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {project.last_content_error}
+          </pre>
+        </div>
+      )}
 
       {/* Admin exports — interview only or interview + strategy + content. */}
       <div className="card mt-4">
