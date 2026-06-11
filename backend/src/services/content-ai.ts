@@ -152,6 +152,11 @@ waar het past ("gewoon", "lekker", "even"). Vermijd marketingtaal en clichés.
 VERBODEN WOORDEN (gebruik deze NIET): "uniek", "passie", "dé", "met passie",
 "met liefde", "vakmanschap en passie", "jouw partner in".
 
+Deze regel geldt voor ALLE velden in elke tool-output: titels, subtitels,
+intro's, body, CTA's, beschrijvingen, hero-titels, alles. Geen uitzonderingen.
+Een hero-titel als "Jouw haar, onze passie" is dus FOUT — kies iets concreets
+zonder verboden woorden.
+
 SLECHT: "Met passie en vakmanschap creëren wij unieke oplossingen."
 GOED: "We maken het gewoon goed. Daar draait het om."
 
@@ -374,13 +379,13 @@ const OVER_FULL_TOOL = {
       body: {
         type: 'string',
         description:
-          'VERPLICHT EN NIET LEEG. De Over-pagina volgens de gekozen methode, ' +
-          'maximaal 1500 tekens (~200-250 woorden). Bevat alle stappen / paragrafen ' +
-          'die in de methode-instructies staan, in compacte vorm. Geen herhaling ' +
-          'van de Home-pagina Over-sectie — focus op nieuwe details, anekdotes, ' +
-          'het moment waarop alles begon. Mag GEEN lege string zijn — als je ' +
-          'twijfelt over inhoud, vertel dan het verhaal zo goed mogelijk op basis ' +
-          'van de interview-antwoorden.',
+          'VERPLICHT EN NIET LEEG. De Over-pagina volgens de gekozen methode. ' +
+          'HARDE LIMIET: MAXIMAAL 1500 TEKENS (~200-250 woorden). Tel je tekens. ' +
+          'Bij overschrijding: schrap de minst essentiële alinea. Bevat alle ' +
+          'stappen/paragrafen uit de methode-instructies, in compacte vorm. ' +
+          'Geen herhaling van de Home-pagina Over-sectie — focus op nieuwe ' +
+          'details, anekdotes, het moment waarop alles begon. Mag GEEN lege ' +
+          'string zijn.',
       },
       cta_text: { type: 'string', description: 'Max 5 woorden.' },
     },
@@ -433,15 +438,17 @@ De write_over_full tool heeft 4 velden. Vul ALLE vier — vooral body is verplic
 - intro: maximaal 2 zinnen die de lezer binnenhalen. Géén samenvatting van het
   hele verhaal.
 - body: het VOLLEDIGE verhaal volgens de methode-structuur hieronder.
-  Maximaal 1500 tekens (richtlijn ~200-250 woorden), alle paragrafen uit de
-  methode in compacte vorm. Dit veld mag NOOIT leeg zijn — als de body leeg
-  blijft, faalt de generatie. Liever een kortere body op basis van het
-  interview dan helemaal geen body.
+  HARDE LIMIET: MAXIMAAL 1500 TEKENS (ongeveer 200-250 woorden). Niet 2000,
+  niet 1800 — maximaal 1500. Tel je tekens terwijl je schrijft. Kom je boven
+  de 1500 uit, schrap dan de minst essentiële alinea (vaak de obstakels of
+  een herhaling van waarden) en behoud begin, keerpunt en nu. Een te lange
+  body wordt afgekeurd. Dit veld mag NOOIT leeg zijn — als de body leeg blijft,
+  faalt de generatie. Liever een kortere body dan helemaal geen body.
 - cta_text: max 5 woorden. Persoonlijk en pagina-specifiek (bijv. "Leer
   [naam] kennen", "Lees het verhaal"). Niet de website-brede primaire CTA.
 
 Veel voorkomende fout: de methode-structuur in intro proppen en body leeg
-laten. Doe dat niet. Het hele methode-verhaal hoort in body.
+laten. Doe dat niet. Het hele methode-verhaal hoort in body — beknopt.
 
 ${methodInstructions}
 
@@ -468,7 +475,7 @@ ${ans(ctx, 'p6q5', 'p6q6', 'p7q5', 'p7q6')}
     systemPrompt: system,
     messages: [{ role: 'user', content: user }],
     tool: OVER_FULL_TOOL,
-    maxTokens: 2048,
+    maxTokens: 1024,
     purpose: 'content/over-full',
   });
 
@@ -500,7 +507,7 @@ ${ans(ctx, 'p6q5', 'p6q6', 'p7q5', 'p7q6')}
         },
       ],
       tool: OVER_FULL_TOOL,
-      maxTokens: 2048,
+      maxTokens: 1024,
       purpose: 'content/over-full-retry',
     });
     if (retry.body && retry.body.trim().length > 100) {
@@ -628,17 +635,37 @@ ${styleByArchetype[ctx.archetype]}
 - Omschrijving = ${options.isFullPage ? '80-130 woorden' : '40-60 woorden'}, per archetype-stijl
 - CTA = max 5 woorden, past bij de gebruiks-context (homepage soft, pagina meer richting actie)
 
-## Item-CTA's — VARIEER (op verdiepingspagina, cruciaal)
+## Item-CTA's — VARIEER (op verdiepingspagina, ABSOLUUT cruciaal)
 ${
   options.isFullPage
-    ? 'Op de verdiepingspagina krijgt elk item een cta_text — maar VARIEER ze. ' +
-      'NIET alle items dezelfde CTA. Wissel af op basis van wat de dienst vraagt: ' +
-      '"Plan een kennismaking", "Bekijk dit pakket", "Vraag een offerte aan", ' +
-      '"Meer weten?", "Bekijk de details", "Boek deze sessie", "Neem contact op". ' +
-      'Maximaal één item mag exact dezelfde CTA hebben als de primary CTA — de ' +
-      'rest moet onderling verschillen. Drie identieke CTA\'s onder elkaar is een fout.'
+    ? 'Op de verdiepingspagina krijgt elk item een cta_text. De CTA-teksten ' +
+      'MOETEN onderling ALLEMAAL VERSCHILLEND zijn — niet één paar gelijke, ' +
+      'niet drie gelijke, ALLEMAAL uniek per item. ' +
+      'Kies per item uit een mix als: "Boek een afspraak", "Plan een ' +
+      'kennismaking", "Neem contact op", "Meer weten?", "Bekijk de details", ' +
+      '"Vraag een offerte aan", "Plan deze behandeling", "Bekijk dit pakket", ' +
+      '"Reserveer een plek". ' +
+      'DRIE IDENTIEKE CTA-TEKSTEN ONDER ELKAAR IS EEN FOUT. ' +
+      'VIER IDENTIEKE CTA-TEKSTEN IS EEN GROVERE FOUT. ' +
+      'Voordat je de tool aanroept: controleer je service-CTA-teksten. Staan er twee ' +
+      'of meer hetzelfde? Pas dan minstens één aan voordat je verstuurt.'
     : 'Op de homepage gebruik je een zachte info-CTA per item ("Meer over dit ' +
       'traject", "Lees verder"). Verschillende items mogen hier varianten hebben.'
+}
+
+## SECTIE-TITEL — uniek per pagina (cruciaal)
+${
+  options.isFullPage
+    ? 'Dit is de diensten-VERDIEPINGSPAGINA (Behandelingen, Diensten, Pakketten, ' +
+      'Aanbod, Portfolio, etc.). De sectie-titel MOET specifiek zijn voor het ' +
+      'aanbod van dit bedrijf en MAG NIET dezelfde zijn als de diensten-titel op ' +
+      'de homepage. Voorbeelden: "Behandelingen en prijzen", "Alle wandelingen ' +
+      'op een rij", "Onze diensten in detail", "Wat ik allemaal aanbied". ' +
+      'Gebruik NOOIT "Zo kan ik je helpen" of een andere generieke kop die ook op ' +
+      'de homepage zou kunnen staan.'
+    : 'Dit is de homepage-versie van de diensten-sectie. Een korte, ' +
+      'herkenbare titel volstaat ("Zo kan ik je helpen", "Onze diensten"). De ' +
+      'verdiepingspagina krijgt een andere, specifiekere titel.'
 }
 
 ${accuracyBlock(ctx)}
@@ -779,15 +806,19 @@ ${
       'pagina-specifieke titel.'
 }
 
-## Item-CTA's — VARIEER (op verdiepingspagina, cruciaal)
+## Item-CTA's — VARIEER (op verdiepingspagina, ABSOLUUT cruciaal)
 ${
   options.isFullPage
-    ? 'Op de verdiepingspagina krijgt elk item een cta_text — maar varieer ze. ' +
-      'NIET alle items dezelfde CTA. Wissel af, passend bij de quote of casus: ' +
-      '"Plan een kennismaking", "Bekijk dit pakket", "Vraag het programma op", ' +
-      '"Lees het hele verhaal", "Neem contact op", "Ontdek de werkwijze". Maximaal ' +
-      'één item mag dezelfde CTA hebben als de primary CTA — de rest moet ' +
-      'onderling verschillen.'
+    ? 'Op de verdiepingspagina krijgt elk item een cta_text. De CTA-teksten ' +
+      'MOETEN onderling ALLEMAAL VERSCHILLEND zijn — niet één paar gelijke, ' +
+      'niet drie gelijke, ALLEMAAL uniek per item. Kies per item uit een mix ' +
+      'als: "Plan een kennismaking", "Boek een afspraak", "Bekijk dit pakket", ' +
+      '"Vraag het programma op", "Lees het hele verhaal", "Neem contact op", ' +
+      '"Ontdek de werkwijze", "Meer weten?". ' +
+      'DRIE IDENTIEKE CTA-TEKSTEN ONDER ELKAAR IS EEN FOUT. ' +
+      'ZES IDENTIEKE CTA-TEKSTEN IS GROVE NALATIGHEID. ' +
+      'Voordat je de tool aanroept: kijk je item-CTAs door. Staan er twee of meer ' +
+      'hetzelfde? Pas dan minstens één aan voordat je verstuurt.'
     : 'Op de homepage laat je item cta_text leeg.'
 }
 
@@ -820,19 +851,30 @@ context zoals genoemd. Eén quote = één item.
 CASE A½ — Ondernemer BESCHRIJFT een klantverhaal maar geeft GEEN
 letterlijke quote.
 Bijv. "een vaste klant uit Utrecht, zorgmedewerker, was eerder bij een
-keten en altijd ontevreden". Dit is GEEN quote, alleen een beschrijving
-door de ondernemer. Vul dan in:
-- title: korte koptekst die de transformatie of kern vat (niet als quote
-  geformuleerd).
-- subtitle: de klant-context zoals beschreven (bijv. "Vaste klant,
-  zorgmedewerker uit Utrecht") — dit is veilig want het komt
-  rechtstreeks uit het interview.
-- quote: "[INVULLEN: vraag deze klant om een quote van ${options.isFullPage ? '80-120' : '40-80'}
-  woorden over hun ervaring. Context: ${'<korte hint o.b.v. het verhaal>'}]"
+keten en altijd ontevreden, komt nu om de tien weken bij mij". Dit is
+GEEN quote — het is een beschrijving in de woorden van de ondernemer.
+Vul dan in:
 
-  Schrijf NOOIT een first-person quote ("Ik was zo blij...", "Bij een
-  grote keten ging het altijd te snel...") op basis van wat de ondernemer
-  paraphraseerde. Dat is fabricage, ook als het verhaal echt is.
+- title: korte koptekst die de transformatie of kern vat. Geen
+  aanhalingstekens, geen first-person formulering.
+- subtitle: de klant-context zoals beschreven door de ondernemer, in
+  DERDE PERSOON (bijv. "Vaste klant, zorgmedewerker uit Utrecht"). Dit is
+  veilig want het komt rechtstreeks uit het interview.
+- quote: VERPLICHT een placeholder, OOK als je het verhaal kent:
+  "[INVULLEN: vraag deze klant om een eigen quote van ${options.isFullPage ? '80-120' : '40-80'}
+  woorden over haar ervaring. Context: ${'<1 zin samenvatting uit het interview>'}]"
+
+CASE A½ is een placeholder-case voor de quote. Het verschil met CASE B is
+alleen dat je voor de subtitle wél echte context hebt — de quote zelf
+blijft altijd een placeholder.
+
+ABSOLUUT VERBODEN bij CASE A½:
+- First-person quotes ("Ik ging jarenlang naar...", "Ik was zo blij...").
+- Third-person navertellingen die je tussen aanhalingstekens zet of als
+  quote-veld vult. Een navertelling hoort in subtitle, niet in quote.
+- Per pagina een andere formulering kiezen (op Home third person, op de
+  ervaringen-pagina first person). Kies één case-classificatie per casus
+  en pas die identiek toe op alle pagina's waar de testimonial verschijnt.
 
 CASE B — Ondernemer noemde wel klanten / aantallen / sterren maar geen
 specifieke casus of quote.
