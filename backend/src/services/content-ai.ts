@@ -807,17 +807,40 @@ Verzin NOOIT:
 
 ### Hoe je items vult per geval
 
-CASE A — Ondernemer leverde een concrete quote of casus aan.
-Gebruik die letterlijk of bijna letterlijk. Behoud de naam en context exact
-zoals genoemd. Eén casus = één item.
+Er zijn vier soorten klantverhalen die je in het interview kunt aantreffen.
+Kies per item zorgvuldig de juiste case — het verschil tussen A en A½ is
+cruciaal en wordt vaak fout gedaan.
+
+CASE A — Ondernemer leverde een LETTERLIJKE QUOTE van de klant.
+Herkenbaar aan aanhalingstekens of formuleringen als "de klant zei...",
+"hij schreef me...", "ze stuurde een berichtje:...". Gebruik de quote
+exact (of bijna exact, alleen kleine taalcorrecties). Behoud naam en
+context zoals genoemd. Eén quote = één item.
+
+CASE A½ — Ondernemer BESCHRIJFT een klantverhaal maar geeft GEEN
+letterlijke quote.
+Bijv. "een vaste klant uit Utrecht, zorgmedewerker, was eerder bij een
+keten en altijd ontevreden". Dit is GEEN quote, alleen een beschrijving
+door de ondernemer. Vul dan in:
+- title: korte koptekst die de transformatie of kern vat (niet als quote
+  geformuleerd).
+- subtitle: de klant-context zoals beschreven (bijv. "Vaste klant,
+  zorgmedewerker uit Utrecht") — dit is veilig want het komt
+  rechtstreeks uit het interview.
+- quote: "[INVULLEN: vraag deze klant om een quote van ${options.isFullPage ? '80-120' : '40-80'}
+  woorden over hun ervaring. Context: ${'<korte hint o.b.v. het verhaal>'}]"
+
+  Schrijf NOOIT een first-person quote ("Ik was zo blij...", "Bij een
+  grote keten ging het altijd te snel...") op basis van wat de ondernemer
+  paraphraseerde. Dat is fabricage, ook als het verhaal echt is.
 
 CASE B — Ondernemer noemde wel klanten / aantallen / sterren maar geen
-specifieke quotes.
+specifieke casus of quote.
 Gebruik dat aantal of sterren in de intro, en zet voor elk item:
 - title: korte placeholder, bijv. "Ervaring 1"
 - subtitle: "[INVULLEN: naam + context, bijv. Lisa, 38 jaar of Teamleider in Amsterdam]"
 - quote: "[INVULLEN: echte klantquote — vraag een vaste klant om een review
-  van 40-80 woorden]"
+  van ${options.isFullPage ? '80-120' : '40-80'} woorden]"
 
 CASE C — Ondernemer zei "nee" / "nog geen klantverhalen" / "ik ben net begonnen".
 Vul de hele set als placeholders zoals in CASE B, met intro:
@@ -825,6 +848,14 @@ Vul de hele set als placeholders zoals in CASE B, met intro:
 title van het EERSTE item toe:
 "[NOTITIE VOOR ONDERNEMER: Vul hier echte klantervaringen in. Verzonnen
 reviews zijn juridisch en reputationeel riskant.]"
+
+### Ankerregel voor quotes — STRIKT
+Schrijf NOOIT een first-person quote tenzij de ondernemer die specifieke
+woorden LETTERLIJK heeft aangeleverd als woorden van de klant. Een
+beschrijving door de ondernemer ("ze was nooit blij in een keten") is
+GEEN quote — die hoort onder CASE A½ met een placeholder voor de quote.
+"Geïnspireerd op een echte casus" rechtvaardigt niet dat je iets tussen
+aanhalingstekens zet.
 
 ### Quote-lengte
 ${options.isFullPage ? '80-120 woorden per echte quote' : '40-80 woorden per echte quote'}.
