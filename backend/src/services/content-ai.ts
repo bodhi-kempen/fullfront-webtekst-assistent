@@ -144,6 +144,43 @@ function styleBlock(ctx: GenContext, opts?: { isFullPage?: boolean }): string {
 - Concrete taal, geen marketing-clichés.
 - Nederlands.
 
+## SPREEKTAAL EN PERSOONLIJKHEID
+Schrijf alsof de ondernemer zelf praat. Gebruik korte zinnen. Wissel lange en
+korte zinnen af. Begin af en toe een zin met "En" of "Maar". Gebruik spreektaal
+waar het past ("gewoon", "lekker", "even"). Vermijd marketingtaal en clichés.
+
+VERBODEN WOORDEN (gebruik deze NIET): "uniek", "passie", "dé", "met passie",
+"met liefde", "vakmanschap en passie", "jouw partner in".
+
+SLECHT: "Met passie en vakmanschap creëren wij unieke oplossingen."
+GOED: "We maken het gewoon goed. Daar draait het om."
+
+## UNIEKE TITELS PER PAGINA — STRIKT
+Gebruik NOOIT dezelfde titel op meerdere pagina's. Elke pagina verdient een
+unieke, specifieke titel. "Zo kan ik je helpen" mag maar op één pagina
+voorkomen. De diensten-pagina moet een titel hebben die specifiek is voor het
+aanbod (bijv. "Wandelingen en opvang voor jouw hond" in plaats van het
+generieke "Zo kan ik je helpen"). Maak titels concreet aan de hand van het
+echte aanbod van dit bedrijf.
+
+## KORTE, PUNCHIGE INTRO'S
+Intro's zijn maximaal 2 zinnen. Gebruik korte, krachtige zinnen die direct
+aanspreken. Vermijd beschrijvende opsommingen.
+
+SLECHT: "Of je hond nu een sociale vlinder is of liever wat rust heeft, bij
+Blije Pootjes krijgt elke hond de dag die bij hem past. Beweging, aandacht en
+contact, afgestemd op wie jouw hond is."
+GOED: "Jouw hond verdient meer dan een rondje om het blok. Dit is wat we voor
+hem doen."
+
+## GEVARIEERDE CTA'S PER PAGINA
+Gebruik NIET dezelfde CTA-tekst op elke pagina. Varieer de CTA per context:
+- Home hero: actiegericht ("Plan een kennismaking", "Boek je afspraak")
+- Diensten: specifiek ("Bekijk de wandelingen", "Bekijk het aanbod")
+- Over: persoonlijk ("Leer [naam] kennen", "Lees het verhaal")
+- Ervaringen: sociaal bewijs ("Bekijk alle ervaringen", "Lees wat klanten zeggen")
+- Contact: laagdrempelig ("Stuur een berichtje", "Neem contact op")
+
 ## INTERPUNCTIE — STRIKT
 - Gebruik NOOIT em dashes (—) of en dashes (–) in je teksten.
 - Gebruik gewone leestekens: punten, komma's, dubbele punten.
@@ -331,17 +368,19 @@ const OVER_FULL_TOOL = {
       intro: {
         type: 'string',
         description:
-          'KORT, 2-3 zinnen, max ~50 woorden. Hooks de lezer, vat NIET het ' +
-          'hele verhaal samen. De volledige inhoud hoort in body.',
+          'KORT, max 2 zinnen. Hooks de lezer, vat NIET het hele verhaal samen. ' +
+          'De volledige inhoud hoort in body.',
       },
       body: {
         type: 'string',
         description:
-          'VERPLICHT EN NIET LEEG. De volledige Over-pagina volgens de gekozen ' +
-          'methode (300-600 woorden). Bevat alle stappen / paragrafen die in de ' +
-          'methode-instructies staan. Mag GEEN lege string zijn — als je twijfelt ' +
-          'over inhoud, vertel dan het verhaal zo goed mogelijk op basis van de ' +
-          'interview-antwoorden.',
+          'VERPLICHT EN NIET LEEG. De Over-pagina volgens de gekozen methode, ' +
+          'maximaal 1500 tekens (~200-250 woorden). Bevat alle stappen / paragrafen ' +
+          'die in de methode-instructies staan, in compacte vorm. Geen herhaling ' +
+          'van de Home-pagina Over-sectie — focus op nieuwe details, anekdotes, ' +
+          'het moment waarop alles begon. Mag GEEN lege string zijn — als je ' +
+          'twijfelt over inhoud, vertel dan het verhaal zo goed mogelijk op basis ' +
+          'van de interview-antwoorden.',
       },
       cta_text: { type: 'string', description: 'Max 5 woorden.' },
     },
@@ -379,17 +418,27 @@ Per teamlid: naam, functie, specialiteiten, persoonlijke beschrijving (1 alinea 
 Je schrijft de Over-pagina. Doel: VERTROUWEN creëren. De WHY is belangrijker
 dan de WAT.
 
+## UNIEK VERHAAL — NIET HERHALEN WAT OP HOME STAAT
+De Over-pagina mag NIET dezelfde informatie herhalen die al op de Home-pagina
+staat. De Home "Over (kort)" sectie geeft een samenvatting. De Over-pagina
+vertelt het UITGEBREIDE verhaal met details die niet op Home staan:
+persoonlijke anekdotes, het moment waarop alles begon, de eerste klant, een
+specifieke herinnering. Maak het concreet en menselijk, geen herhaling van de
+samenvatting.
+
 ## Veldverdeling — STRIKT (cruciaal)
 De write_over_full tool heeft 4 velden. Vul ALLE vier — vooral body is verplicht:
-- title: korte pagina-titel, max ~8 woorden.
-- intro: 2-3 zinnen die de lezer binnenhalen. Géén samenvatting van het
-  hele verhaal. Maximaal ~50 woorden.
+- title: korte pagina-titel, max ~8 woorden. UNIEK voor deze pagina, niet
+  dezelfde als een andere pagina.
+- intro: maximaal 2 zinnen die de lezer binnenhalen. Géén samenvatting van het
+  hele verhaal.
 - body: het VOLLEDIGE verhaal volgens de methode-structuur hieronder.
-  Minimum 300 woorden, target 400-600 woorden, alle paragrafen uit de
-  methode. Dit veld mag NOOIT leeg zijn — als de body leeg blijft, faalt
-  de generatie. Schrijf eerder een korte body op basis van het interview
-  dan helemaal geen body.
-- cta_text: max 5 woorden, sluit aan op de primary CTA.
+  Maximaal 1500 tekens (richtlijn ~200-250 woorden), alle paragrafen uit de
+  methode in compacte vorm. Dit veld mag NOOIT leeg zijn — als de body leeg
+  blijft, faalt de generatie. Liever een kortere body op basis van het
+  interview dan helemaal geen body.
+- cta_text: max 5 woorden. Persoonlijk en pagina-specifiek (bijv. "Leer
+  [naam] kennen", "Lees het verhaal"). Niet de website-brede primaire CTA.
 
 Veel voorkomende fout: de methode-structuur in intro proppen en body leeg
 laten. Doe dat niet. Het hele methode-verhaal hoort in body.
@@ -691,6 +740,17 @@ Je schrijft de ervaringen/reviews/portfolio sectie.
 ## Aantal items
 ${options.count} items.
 
+## Intro-lengte
+${
+  options.isFullPage
+    ? 'Dit is de volledige ervaringen-pagina. De intro is LANGER en RIJKER dan ' +
+      'op de homepage: 3-4 zinnen. Vertel waarom klantervaringen belangrijk zijn ' +
+      'voor dít specifieke bedrijf, geef context bij wat lezers gaan vinden. ' +
+      'Dit is een uitzondering op de algemene "intro max 2 zinnen" regel.'
+    : 'Dit is de homepage-versie van de ervaringen-sectie. Intro = 1-2 zinnen, ' +
+      'kort en uitnodigend. De diepere intro hoort op de volledige ervaringen-pagina.'
+}
+
 ## Stijl per item (archetype: ${ctx.archetype})
 ${styleByArchetype[ctx.archetype]}
 
@@ -841,7 +901,7 @@ const FOOTER_TOOL = {
       description: {
         type: 'string',
         description:
-          'Max 30 woorden. Format: "[Bedrijfsnaam] — [wat je doet] in [regio]" of "Dé [specialist] voor [doelgroep] in [regio]".',
+          'Max 30 woorden. Format: "[Bedrijfsnaam], [wat je doet] in [regio]" of "[Specialist] voor [doelgroep] in [regio]".',
       },
     },
     required: ['description'],
