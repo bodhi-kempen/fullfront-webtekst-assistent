@@ -628,6 +628,19 @@ ${styleByArchetype[ctx.archetype]}
 - Omschrijving = ${options.isFullPage ? '80-130 woorden' : '40-60 woorden'}, per archetype-stijl
 - CTA = max 5 woorden, past bij de gebruiks-context (homepage soft, pagina meer richting actie)
 
+## Item-CTA's — VARIEER (op verdiepingspagina, cruciaal)
+${
+  options.isFullPage
+    ? 'Op de verdiepingspagina krijgt elk item een cta_text — maar VARIEER ze. ' +
+      'NIET alle items dezelfde CTA. Wissel af op basis van wat de dienst vraagt: ' +
+      '"Plan een kennismaking", "Bekijk dit pakket", "Vraag een offerte aan", ' +
+      '"Meer weten?", "Bekijk de details", "Boek deze sessie", "Neem contact op". ' +
+      'Maximaal één item mag exact dezelfde CTA hebben als de primary CTA — de ' +
+      'rest moet onderling verschillen. Drie identieke CTA\'s onder elkaar is een fout.'
+    : 'Op de homepage gebruik je een zachte info-CTA per item ("Meer over dit ' +
+      'traject", "Lees verder"). Verschillende items mogen hier varianten hebben.'
+}
+
 ${accuracyBlock(ctx)}
 
 ${styleBlock(ctx, { isFullPage: options.isFullPage })}
@@ -749,6 +762,33 @@ ${
       'Dit is een uitzondering op de algemene "intro max 2 zinnen" regel.'
     : 'Dit is de homepage-versie van de ervaringen-sectie. Intro = 1-2 zinnen, ' +
       'kort en uitnodigend. De diepere intro hoort op de volledige ervaringen-pagina.'
+}
+
+## Sectie-titel — UNIEK PER PAGINA (cruciaal)
+${
+  options.isFullPage
+    ? 'Dit is de Ervaringen-PAGINA. De titel MOET ANDERS zijn dan de titel die ' +
+      'op de homepage boven de ervaringen-sectie staat. De homepage gebruikt ' +
+      'meestal iets als "Wat klanten zeggen" of "Ervaringen"; kies hier een ' +
+      'titel die bij de PAGINA past en het bedrijf concreet maakt. Voorbeelden: ' +
+      '"Ervaringen van onze klanten", "Verhalen van stellen die voor ons kozen", ' +
+      '"Zo kijken klanten terug op onze samenwerking". NOOIT exact dezelfde ' +
+      'tekst als op de homepage.'
+    : 'Dit is de homepage-sectie. Houd de titel kort en herkenbaar ("Wat ' +
+      'klanten zeggen", "Ervaringen"). De Ervaringen-pagina krijgt een andere, ' +
+      'pagina-specifieke titel.'
+}
+
+## Item-CTA's — VARIEER (op verdiepingspagina, cruciaal)
+${
+  options.isFullPage
+    ? 'Op de verdiepingspagina krijgt elk item een cta_text — maar varieer ze. ' +
+      'NIET alle items dezelfde CTA. Wissel af, passend bij de quote of casus: ' +
+      '"Plan een kennismaking", "Bekijk dit pakket", "Vraag het programma op", ' +
+      '"Lees het hele verhaal", "Neem contact op", "Ontdek de werkwijze". Maximaal ' +
+      'één item mag dezelfde CTA hebben als de primary CTA — de rest moet ' +
+      'onderling verschillen.'
+    : 'Op de homepage laat je item cta_text leeg.'
 }
 
 ## Stijl per item (archetype: ${ctx.archetype})
@@ -1008,6 +1048,11 @@ export async function generateContactPage(ctx: GenContext): Promise<ContactOutpu
 
   const system = `
 Je schrijft de teksten voor de contactpagina.
+
+## Intro-lengte — uitzondering op de algemene regel
+Op de contactpagina mag de intro 2-3 zinnen zijn (i.p.v. de standaard max 2).
+Een goede contact-intro combineert context + uitnodiging + actie en heeft
+daarvoor vaak één extra zin nodig. Houd het wel kort en spreektaal.
 
 ## Titel-suggestie voor archetype ${ctx.archetype}
 ${titles[ctx.archetype]} — pas aan als beter past.
