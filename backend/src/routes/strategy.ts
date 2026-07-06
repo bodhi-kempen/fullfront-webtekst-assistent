@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { contentGenerateLimiter } from '../middleware/rateLimit.js';
 import { assertProjectAccess } from '../lib/projectAccess.js';
 import { setProjectInContext } from '../lib/usage.js';
 import {
@@ -61,7 +62,10 @@ strategyRouter.put('/', async (req, res, next) => {
 });
 
 // POST /api/projects/:id/strategy/approve
-strategyRouter.post('/approve', async (req, res, next) => {
+// Rate-limited on the same 3/hour bucket as /generate because approve kicks off
+// full-project content generation. Cheap approvals without regeneration are
+// not currently possible from the API — every approve triggers a fresh run.
+strategyRouter.post('/approve', contentGenerateLimiter, async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertProjectAccess(projectId, req.user!);

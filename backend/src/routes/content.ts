@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { contentGenerateLimiter } from '../middleware/rateLimit.js';
 import { assertProjectAccess } from '../lib/projectAccess.js';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { setProjectInContext } from '../lib/usage.js';
@@ -17,7 +18,9 @@ function getId(req: { params: unknown }): string {
 }
 
 // POST /api/projects/:id/generate
-contentRouter.post('/generate', async (req, res, next) => {
+// Per-user 3/hour rate limit — full-project generation costs ~$0.30 and we
+// don't want an accidental loop burning through a user's budget cap.
+contentRouter.post('/generate', contentGenerateLimiter, async (req, res, next) => {
   try {
     const projectId = getId(req);
     await assertProjectAccess(projectId, req.user!);

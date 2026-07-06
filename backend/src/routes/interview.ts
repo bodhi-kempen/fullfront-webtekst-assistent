@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { interviewAnswerLimiter } from '../middleware/rateLimit.js';
 import { assertProjectAccess } from '../lib/projectAccess.js';
 import { setProjectInContext } from '../lib/usage.js';
 import {
@@ -27,7 +28,9 @@ interviewRouter.post('/start', async (req, res, next) => {
 });
 
 // POST /api/projects/:id/interview/answer
-interviewRouter.post('/answer', async (req, res, next) => {
+// Per-user 30/min rate limit — comfortably above a normal typing pace, but
+// bounds scripted flooding of a single project's answer stream.
+interviewRouter.post('/answer', interviewAnswerLimiter, async (req, res, next) => {
   try {
     const projectId = (req.params as { id: string }).id;
     await assertProjectAccess(projectId, req.user!);

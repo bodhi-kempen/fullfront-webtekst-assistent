@@ -31,7 +31,8 @@ interface FieldRow {
 
 export async function updateFieldValue(
   fieldId: string,
-  newValue: string
+  newValue: string,
+  expectedSectionId?: string
 ): Promise<{ id: string; field_name: string; field_value: string; version: number }> {
   // Read existing
   const { data: existing, error: rErr } = await supabaseAdmin
@@ -41,6 +42,12 @@ export async function updateFieldValue(
     .maybeSingle();
   if (rErr) throw rErr;
   if (!existing) {
+    throw Object.assign(new Error('Field not found'), { statusCode: 404 });
+  }
+  // Scope check: caller has already verified ownership of expectedSectionId.
+  // If the field belongs to a different section, treat it as not found rather
+  // than leaking cross-section state via a distinct error code.
+  if (expectedSectionId && existing.section_id !== expectedSectionId) {
     throw Object.assign(new Error('Field not found'), { statusCode: 404 });
   }
   if (!existing.is_current) {

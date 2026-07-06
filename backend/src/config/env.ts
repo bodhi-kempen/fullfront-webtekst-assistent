@@ -18,16 +18,75 @@ function required(name: string): string {
 
 const isProd = process.env.NODE_ENV === 'production';
 
-// CORS_ORIGIN parsing: accepts a single origin, a comma-separated list, or
-// "*" for any. In production we default to "*" — the deployed frontend hits
-// the same origin so CORS isn't actually used by the app itself, but a
-// permissive default keeps it simple if external clients ever call the API.
-function parseCorsOrigin(): string | string[] | true {
+// Baseline origin allowlist for Fullfront-hosted contexts. Matches the
+// hostnames the app ships with — the main app, the marketing site, and any
+// *.fullfront.nl subdomain used for the ledenomgeving embed. Individual
+// origins compare exact; anything ending in .fullfront.nl is treated as a
+// wildcard subdomain. localhost is only allowed outside production.
+const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
+  'https://webtekst.fullfront.nl',
+  'https://fullfront.nl',
+  'https://www.fullfront.nl',
+];
+const DEFAULT_ALLOWED_SUFFIXES: readonly string[] = [
+  '.fullfront.nl', // covers ledenomgeving.fullfront.nl, staging.fullfront.nl, etc.
+];
+
+function isFullfrontOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== 'https:') return false;
+    const host = url.host.toLowerCase();
+    if (DEFAULT_ALLOWED_ORIGINS.some((o) => new URL(o).host === host)) return true;
+    return DEFAULT_ALLOWED_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * CORS_ORIGIN parsing.
+ * - Empty (dev): allow http://localhost:5173.
+ * - Empty (prod): use the Fullfront allowlist (fullfront.nl + *.fullfront.nl).
+ * - "*": kept for emergencies (staging debugging) but logs a warning at boot.
+ * - Comma-separated: those origins are ADDED to the Fullfront allowlist.
+ *
+ * Returned as a function so we can honour the *.fullfront.nl subdomain
+ * wildcard cleanly. Requests without an Origin header (curl, server-to-server,
+ * same-origin browser calls) still pass — there's no CSRF surface without an
+ * Origin, and blocking them would break the frontend.
+ */
+type CorsOriginFn = (
+  origin: string | undefined,
+  cb: (err: Error | null, allow?: boolean) => void
+) => void;
+
+function parseCorsOrigin(): string | string[] | true | CorsOriginFn {
   const raw = process.env.CORS_ORIGIN;
-  if (!raw) return isProd ? true : 'http://localhost:5173';
-  if (raw === '*') return true;
-  if (raw.includes(',')) return raw.split(',').map((s) => s.trim()).filter(Boolean);
-  return raw;
+  if (raw === '*') {
+    console.warn(
+      '[cors] CORS_ORIGIN="*" — allowing any origin. Only use for temporary debugging.'
+    );
+    return true;
+  }
+
+  // Dev default: local Vite only.
+  if (!raw && !isProd) {
+    return 'http://localhost:5173';
+  }
+
+  const extras = (raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (isFullfrontOrigin(origin)) return cb(null, true);
+    if (extras.includes(origin)) return cb(null, true);
+    if (!isProd && origin.startsWith('http://localhost:')) return cb(null, true);
+    return cb(new Error(`CORS: origin ${origin} not allowed`));
+  };
 }
 
 // Comma-separated list of origins allowed to embed the app in an <iframe>.

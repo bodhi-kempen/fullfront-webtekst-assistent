@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { sectionRegenerateLimiter } from '../middleware/rateLimit.js';
 import { assertSectionAccess } from '../lib/projectAccess.js';
 import { setProjectInContext } from '../lib/usage.js';
 import {
@@ -30,7 +31,10 @@ editingRouter.put('/:id/content/:field_id', async (req, res, next) => {
     if (typeof value !== 'string') {
       return res.status(400).json({ error: 'value (string) is required' });
     }
-    const updated = await updateFieldValue(fieldId, value);
+    // Force the field to belong to the section we just access-checked.
+    // Without this a user who owns section A could send another user's
+    // field_id and updateFieldValue would happily overwrite their row.
+    const updated = await updateFieldValue(fieldId, value, sectionId);
     res.json({ field: updated });
   } catch (err) {
     const s = statusFromErr(err);
@@ -40,7 +44,9 @@ editingRouter.put('/:id/content/:field_id', async (req, res, next) => {
 });
 
 // POST /api/sections/:id/regenerate
-editingRouter.post('/:id/regenerate', async (req, res, next) => {
+// Per-user 20/hour rate limit — supports normal polish iterations, but caps
+// accidental loops that would drain Anthropic budget.
+editingRouter.post('/:id/regenerate', sectionRegenerateLimiter, async (req, res, next) => {
   try {
     const sectionId = req.params.id!;
     const owner = await assertSectionAccess(sectionId, req.user!);
@@ -55,7 +61,8 @@ editingRouter.post('/:id/regenerate', async (req, res, next) => {
 });
 
 // POST /api/sections/:id/regenerate-with-prompt
-editingRouter.post('/:id/regenerate-with-prompt', async (req, res, next) => {
+// Shares the section-regenerate quota (20/hour) with the plain regenerate route.
+editingRouter.post('/:id/regenerate-with-prompt', sectionRegenerateLimiter, async (req, res, next) => {
   try {
     const sectionId = req.params.id!;
     const owner = await assertSectionAccess(sectionId, req.user!);
