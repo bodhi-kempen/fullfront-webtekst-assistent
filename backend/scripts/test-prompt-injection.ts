@@ -207,6 +207,10 @@ function nextFallback(): string {
 }
 
 function chooseAnswer(questionId: string): string {
+  // Confirm page proposal refinements so the interview advances.
+  if (/^p10q12_followup_\d+$/.test(questionId)) {
+    return 'Ja, dat klinkt goed. Laten we het zo doen.';
+  }
   if (questionId.includes('_followup_') || questionId.includes('_extra_')) {
     return nextFallback();
   }
@@ -326,6 +330,9 @@ async function main(): Promise<void> {
       turn += 1;
       const q = step.current_question;
       const answer = chooseAnswer(q.question_id);
+      if (turn % 10 === 0 || turn === 1) {
+        console.log(`  turn ${turn.toString().padStart(3)} → ${q.question_id}`);
+      }
       step = await api<InterviewStep>(
         'POST',
         `/api/projects/${projectId}/interview/answer`,
