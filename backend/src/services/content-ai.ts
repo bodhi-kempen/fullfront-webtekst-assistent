@@ -149,6 +149,37 @@ Schrijf alsof de ondernemer zelf praat. Gebruik korte zinnen. Wissel lange en
 korte zinnen af. Begin af en toe een zin met "En" of "Maar". Gebruik spreektaal
 waar het past ("gewoon", "lekker", "even"). Vermijd marketingtaal en clichés.
 
+## CONCRETE MENSELIJKE DETAILS — BEHOUD ZE
+Als de ondernemer concrete, zintuiglijke of menselijke details noemt in het
+interview, gebruik die letterlijk (of bijna letterlijk) in de copy. Deze
+details maken de tekst geloofwaardig en persoonlijk. Voorbeelden van dingen
+die je NIET mag wegvegen in algemene formuleringen:
+- "we beginnen met een gesprek en een kop koffie" → gebruik "koffie" letterlijk
+- "een proefstuk vooraf" → noem het proefstuk
+- "foto's na elke wandeling" → noem de foto's
+- specifieke voorwerpen, geuren, geluiden, plekken, momenten die de ondernemer
+  aanhaalt (een keukentafel, een houten vloer, de tuin, de eerste maandag)
+Vervang deze détails NOOIT door abstracte woorden als "persoonlijke aandacht"
+of "warme sfeer". Het detail zelf IS de persoonlijke aandacht.
+
+## ALLE DOELGROEPEN DEKKEN
+Als de ondernemer meerdere doelgroepen of situaties noemt in het interview
+(bijv. "vrouwen 30-60, ouderen die moeilijk de deur uit kunnen, en ouders
+met jonge kinderen"), zorg dat ELKE genoemde groep minimaal één keer
+herkenbaar terugkomt in de website-copy. Verdeel ze over hero-subtitel,
+Over-pagina, diensten-omschrijvingen of FAQ-vragen. Laat geen doelgroep
+volledig weg omdat je alleen de eerste hebt uitgewerkt.
+
+## NEDERLANDSE SPELLING — CONTROLEER
+Let op klassieke Nederlandse spelfouten. De meest voorkomende die je moet
+vermijden:
+- d/t in werkwoordsvormen: "plant" (niet "pland"), "wordt" (niet "word"),
+  "vindt" (niet "vind" wanneer 3e persoon enkelvoud), "gebeurt" (niet
+  "gebeurd" wanneer tegenwoordige tijd)
+- "als" vs "dan": bij vergelijkingen "groter dan" (niet "groter als")
+- "hun" vs "hen": "hen" (lijdend/meewerkend voorwerp), "hun" (bezit)
+Controleer je output op deze fouten voordat je de tool aanroept.
+
 VERBODEN WOORDEN (gebruik deze NIET): "uniek", "passie", "dé", "met passie",
 "met liefde", "vakmanschap en passie", "jouw partner in".
 
@@ -278,6 +309,9 @@ ${ans(ctx, 'p2q1', 'p2q5', 'p3q5')}
 
 ## Resultaat en mission
 ${ans(ctx, 'p5q5', 'p7q1')}
+
+## Werkgebied (voor lokale titels)
+${ans(ctx, 'p10q14') || '(niet expliciet genoemd)'}
 `.trim();
 
   return callTool<HeroOutput>({
@@ -638,17 +672,30 @@ ${styleByArchetype[ctx.archetype]}
 ## Item-CTA's — VARIEER (op verdiepingspagina, ABSOLUUT cruciaal)
 ${
   options.isFullPage
-    ? 'Op de verdiepingspagina krijgt elk item een cta_text. De CTA-teksten ' +
-      'MOETEN onderling ALLEMAAL VERSCHILLEND zijn — niet één paar gelijke, ' +
-      'niet drie gelijke, ALLEMAAL uniek per item. ' +
-      'Kies per item uit een mix als: "Boek een afspraak", "Plan een ' +
-      'kennismaking", "Neem contact op", "Meer weten?", "Bekijk de details", ' +
-      '"Vraag een offerte aan", "Plan deze behandeling", "Bekijk dit pakket", ' +
-      '"Reserveer een plek". ' +
+    ? 'Op de verdiepingspagina krijgt elk item een cta_text. Elke item-CTA ' +
+      'linkt naar de contactpagina of het boekingssysteem — GEEN details-, ' +
+      'lees-verder- of "meer weten"-pagina. De CTA-tekst MOET dus actie-taal ' +
+      'zijn die past bij een contact-actie. ' +
+      '\n\nGebruik UITSLUITEND uit deze lijst:\n' +
+      '- "Boek een afspraak"\n' +
+      '- "Plan een kennismaking"\n' +
+      '- "Plan deze behandeling"\n' +
+      '- "Reserveer een plek"\n' +
+      '- "Vraag een offerte aan"\n' +
+      '- "Neem contact op"\n' +
+      '- "Stel een vraag"\n' +
+      '- "Stuur een bericht"\n\n' +
+      'GEBRUIK NOOIT als item-CTA op de verdiepingspagina:\n' +
+      '- "Bekijk de details" (details staan al op deze pagina)\n' +
+      '- "Lees verder" (misleidend: link gaat naar contact, niet naar meer info)\n' +
+      '- "Meer weten?" (dubbelzinnig)\n' +
+      '- "Meer over dit pakket" (link gaat naar contact)\n\n' +
+      'De CTA-teksten MOETEN ook onderling ALLEMAAL VERSCHILLEND zijn — niet ' +
+      'één paar gelijke, niet drie gelijke, ALLEMAAL uniek per item. ' +
       'DRIE IDENTIEKE CTA-TEKSTEN ONDER ELKAAR IS EEN FOUT. ' +
       'VIER IDENTIEKE CTA-TEKSTEN IS EEN GROVERE FOUT. ' +
       'Voordat je de tool aanroept: controleer je service-CTA-teksten. Staan er twee ' +
-      'of meer hetzelfde? Pas dan minstens één aan voordat je verstuurt.'
+      'of meer hetzelfde, of iets uit de verboden-lijst? Pas dan aan voordat je verstuurt.'
     : 'Op de homepage gebruik je een zachte info-CTA per item ("Meer over dit ' +
       'traject", "Lees verder"). Verschillende items mogen hier varianten hebben.'
 }
@@ -809,16 +856,27 @@ ${
 ## Item-CTA's — VARIEER (op verdiepingspagina, ABSOLUUT cruciaal)
 ${
   options.isFullPage
-    ? 'Op de verdiepingspagina krijgt elk item een cta_text. De CTA-teksten ' +
-      'MOETEN onderling ALLEMAAL VERSCHILLEND zijn — niet één paar gelijke, ' +
-      'niet drie gelijke, ALLEMAAL uniek per item. Kies per item uit een mix ' +
-      'als: "Plan een kennismaking", "Boek een afspraak", "Bekijk dit pakket", ' +
-      '"Vraag het programma op", "Lees het hele verhaal", "Neem contact op", ' +
-      '"Ontdek de werkwijze", "Meer weten?". ' +
+    ? 'Op de verdiepingspagina krijgt elk item een cta_text. Elke item-CTA ' +
+      'linkt naar de contactpagina — GEEN details-, lees-verder- of ' +
+      '"meer weten"-pagina. De CTA-tekst MOET dus actie-taal zijn die past ' +
+      'bij een contact-actie.\n\n' +
+      'Gebruik UITSLUITEND uit deze lijst:\n' +
+      '- "Boek een afspraak"\n' +
+      '- "Plan een kennismaking"\n' +
+      '- "Reserveer een plek"\n' +
+      '- "Vraag een offerte aan"\n' +
+      '- "Neem contact op"\n' +
+      '- "Stel een vraag"\n' +
+      '- "Stuur een bericht"\n\n' +
+      'GEBRUIK NOOIT als item-CTA op de verdiepingspagina:\n' +
+      '- "Bekijk het hele verhaal" / "Lees het hele verhaal" (misleidend)\n' +
+      '- "Meer weten?" / "Ontdek de werkwijze" (dubbelzinnig)\n\n' +
+      'De CTA-teksten MOETEN ook onderling ALLEMAAL VERSCHILLEND zijn — niet ' +
+      'één paar gelijke, niet drie gelijke, ALLEMAAL uniek per item. ' +
       'DRIE IDENTIEKE CTA-TEKSTEN ONDER ELKAAR IS EEN FOUT. ' +
       'ZES IDENTIEKE CTA-TEKSTEN IS GROVE NALATIGHEID. ' +
       'Voordat je de tool aanroept: kijk je item-CTAs door. Staan er twee of meer ' +
-      'hetzelfde? Pas dan minstens één aan voordat je verstuurt.'
+      'hetzelfde, of iets uit de verboden-lijst? Pas dan aan voordat je verstuurt.'
     : 'Op de homepage laat je item cta_text leeg.'
 }
 
@@ -1031,6 +1089,11 @@ export async function generateFooter(ctx: GenContext): Promise<FooterOutput> {
 Je schrijft de footer-bedrijfsomschrijving (max 30 woorden).
 Eén compacte zin die zegt: wie ben je, wat doe je, voor wie, in welke regio.
 
+## Regio
+Als de ondernemer een concrete regio of plaatsnaam heeft genoemd (in p10q14
+of eerder), gebruik die letterlijk. Als er geen regio bekend is, gebruik
+"[INVULLEN: regio]" — verzin GEEN regio.
+
 ${accuracyBlock(ctx)}
 
 ${styleBlock(ctx)}
@@ -1042,6 +1105,9 @@ ${ctx.business_name ?? '(naam onbekend)'}
 
 ## Wat het bedrijf doet en voor wie
 ${ans(ctx, 'p1q1', 'p1q3', 'p1q4')}
+
+## Werkgebied
+${ans(ctx, 'p10q14') || '(niet expliciet genoemd — gebruik [INVULLEN: regio] i.p.v. verzinnen)'}
 `.trim();
 
   return callTool<FooterOutput>({
@@ -1154,6 +1220,9 @@ ${ans(ctx, 'p3q3')}
 
 ## Contactgegevens (NAW + zichtbaarheid)
 ${ans(ctx, 'p10q6', 'p10q7')}
+
+## Werkgebied + beschikbaarheid
+${ans(ctx, 'p10q14', 'p10q15') || '(niet expliciet genoemd — laat weg of gebruik [INVULLEN: ...])'}
 `.trim();
 
   return callTool<ContactOutput>({
@@ -1300,10 +1369,42 @@ ${topicsByArchetype[ctx.archetype]}
 ## Titel
 ${titleSuggest}
 
-## Antwoorden
-- Concreet, geen vaagheid.
-- 40-100 woorden per antwoord.
-- Eindig waar passend met een verwijzing of CTA.
+## Antwoorden — STRIKT: verzin geen operationele feiten
+FAQ-antwoorden mogen UITSLUITEND feiten bevatten die letterlijk in het
+interview staan (zie de blokken hieronder). Voor operationele details die
+de ondernemer NIET heeft genoemd geldt zonder uitzondering:
+
+- Verzin NOOIT een concrete waarde. Voorbeelden van feiten die je vaak in
+  de verleiding komt te verzinnen maar NIET mag verzinnen als de ondernemer
+  ze niet noemde:
+  * annuleringstermijn ("48 uur van tevoren", "een dag vooraf")
+  * openingstijden ("ma-vr 9-17", "elke zaterdag open")
+  * weekend-beschikbaarheid ("Dat kan.", "Ja, ook in het weekend")
+  * benodigdheden bij aan-huis-werk ("een keukenstoel, een spiegel en een
+    stopcontact")
+  * reisafstand of werkgebied ("binnen 30 km")
+  * levertijden / responstijden ("binnen 24 uur reactie")
+  * prijzen die niet in de diensten-blok staan
+
+- Voor elk ontbrekend feit KIES je één van deze twee opties:
+  1. Antwoord met [INVULLEN: ...] met een concrete hint van welke
+     informatie de ondernemer moet aanvullen. Bijv.:
+     "Ik werk op afspraak. [INVULLEN: jouw beschikbaarheid, bijv. maandag
+     t/m vrijdag 9-17 uur, weekend op aanvraag.]"
+     "Kosteloos annuleren of verzetten kan [INVULLEN: jouw termijn, bijv.
+     24 of 48 uur van tevoren]."
+  2. Formuleer het antwoord neutraal zonder het ontbrekende feit te
+     claimen. Bijv. "Neem even contact op, dan kijken we samen wat
+     mogelijk is." of "Stuur een berichtje, dan hoor je snel wat de
+     mogelijkheden zijn."
+
+Een verzonnen beleidsregel op een website is een juridisch en
+reputationeel risico voor de ondernemer.
+
+- Andere antwoord-richtlijnen:
+  * Concreet, geen vaagheid als je het feit WEL uit het interview kunt halen.
+  * 40-100 woorden per antwoord.
+  * Eindig waar passend met een verwijzing of CTA.
 
 ${accuracyBlock(ctx)}
 
@@ -1319,6 +1420,11 @@ ${ans(ctx, 'p8q1', 'p8q2', 'p8q3', 'p8q4', 'p8q5')}
 
 ## Werkwijze + contactproces (handig voor "hoe werkt het"-vragen)
 ${ans(ctx, 'p3q1', 'p3q3', 'p10q1', 'p10q3', 'p10q5')}
+
+## Praktisch — werkgebied, beschikbaarheid, annuleringsbeleid
+${ans(ctx, 'p10q14', 'p10q15', 'p10q16')}
+Als één van deze antwoorden ontbreekt of leeg is, gebruik [INVULLEN: ...]
+of een neutrale formulering in het FAQ-antwoord — verzin geen waarde.
 
 ## Diensten (voor pakket/prijs/verzendings-vragen)
 ${servicesBlock(ctx)}

@@ -137,6 +137,12 @@ const ANSWERS_BY_PART: Record<number, string[]> = {
     'Warm, eerlijk, niet commercieel. Spreek klanten aan met "je", nooit met "u". Geen verkooppraat, geen "wij streven naar"-formuleringen.',
     'Ja, dat klinkt goed.',
     'Nee, ik denk dat we het hebben.',
+    // p10q14 — werkgebied
+    'Ik werk in Utrecht en de directe omgeving. Meestal binnen 20 minuten rijden, dus Utrecht, Nieuwegein, Houten, Zeist, IJsselstein, Bunnik, De Bilt.',
+    // p10q15 — beschikbaarheid
+    'Dinsdag tot en met vrijdag overdag, tussen 9 en 17 uur. Geen avonden of weekenden, dat past niet bij hoe ik werk.',
+    // p10q16 — annuleringsbeleid
+    'Kosteloos verzetten of annuleren kan tot 24 uur van tevoren. Daarna reken ik het volle tarief, want ik heb de tijd al gereserveerd en kan niet meer opvullen.',
   ],
 };
 

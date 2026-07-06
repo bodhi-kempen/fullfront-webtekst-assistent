@@ -380,6 +380,26 @@ export const PARTS: Record<Part, PartDef> = {
       { index: 11, text: 'Hoe wil je overkomen op je website? Spreek je klanten aan met "je" of "u"?' },
       { index: 12, text: 'Welke pagina\'s wil je op je website?' },
       { index: 13, text: 'Is er nog iets dat je kwijt wilt over je bedrijf of je website?' },
+      // Practical operational questions (appended so existing p10q13 answers
+      // remain compatible with the "Is er nog iets kwijt" wrap-up).
+      {
+        index: 14,
+        text: 'Nog een paar praktische vragen voor op je website. In welke plaatsen of regio werk je?',
+        goal: 'Werkgebied voor footer, hero-subtitel en FAQ ("kom je ook in mijn omgeving?").',
+      },
+      {
+        index: 15,
+        text: 'Op welke dagen en tijden ben je beschikbaar? Werk je bijvoorbeeld ook \'s avonds of in het weekend?',
+        goal: 'Beschikbaarheid voor contact-pagina en FAQ (weekend, avonden).',
+      },
+      {
+        index: 16,
+        text: 'Wat is je annuleringsbeleid? Bijvoorbeeld: tot hoeveel uur van tevoren kunnen klanten kosteloos annuleren of verzetten?',
+        text_by_mode: {
+          product: 'Wat is je retour- en annuleringsbeleid? Bijvoorbeeld: hoe lang mogen klanten producten retourneren?',
+        },
+        goal: 'Annuleringsbeleid voor FAQ. Voorkomt verzonnen "48 uur"-antwoorden.',
+      },
     ],
   },
 };

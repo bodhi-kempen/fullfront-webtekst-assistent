@@ -226,6 +226,10 @@ async function buildHomeSections(
   });
 
   // --- Diensten (homepage section) ---
+  // Only render section_footer_cta when there is an actual /diensten page to
+  // link to. Without a target page urlFor returns '#', which produces a dead
+  // "Bekijk het volledige aanbod" button on the homepage.
+  const hasDienstenPage = urlDiensten !== '#';
   sections.push({
     section_type: 'diensten',
     fields: [
@@ -238,12 +242,17 @@ async function buildHomeSections(
         { field_name: 'service_cta',         field_value: nonEmpty(s.cta_text, 'Meer informatie'), field_type: 'text',  sort_order: i },
         { field_name: 'service_cta_url',     field_value: urlDiensten,                          field_type: 'url',      sort_order: i },
       ]),
-      f('section_footer_cta_text', nonEmpty(services.section_footer_cta_text, 'Bekijk volledig aanbod'), 'text'),
-      f('section_footer_cta_url',  urlDiensten, 'url'),
+      ...(hasDienstenPage
+        ? [
+            f('section_footer_cta_text', nonEmpty(services.section_footer_cta_text, 'Bekijk volledig aanbod'), 'text'),
+            f('section_footer_cta_url',  urlDiensten, 'url'),
+          ]
+        : []),
     ],
   });
 
   // --- Ervaringen (homepage section, no per-item cta) ---
+  const hasErvaringenPage = urlErvaringen !== '#';
   sections.push({
     section_type: 'ervaringen',
     fields: [
@@ -254,8 +263,12 @@ async function buildHomeSections(
         { field_name: 'item_subtitle', field_value: nonEmpty(t.subtitle, 'Klant'),              field_type: 'text',     sort_order: i },
         { field_name: 'item_quote',    field_value: t.quote,                                    field_type: 'textarea', sort_order: i },
       ]),
-      f('section_footer_cta_text', nonEmpty(testimonials.section_footer_cta_text, 'Bekijk alle ervaringen'), 'text'),
-      f('section_footer_cta_url',  urlErvaringen, 'url'),
+      ...(hasErvaringenPage
+        ? [
+            f('section_footer_cta_text', nonEmpty(testimonials.section_footer_cta_text, 'Bekijk alle ervaringen'), 'text'),
+            f('section_footer_cta_url',  urlErvaringen, 'url'),
+          ]
+        : []),
     ],
   });
 
@@ -369,6 +382,28 @@ function buildFooterFields(
   pushIf('social_linkedin', business?.social_linkedin, 'url');
   pushIf('social_twitter', business?.social_twitter, 'url');
   pushIf('social_youtube', business?.social_youtube, 'url');
+
+  // Social placeholder: if the ondernemer mentioned a channel anywhere in the
+  // interview but no URL was captured, surface an [INVULLEN: ...] placeholder
+  // so the channel doesn't silently drop out of the footer. Otherwise a Rachel-
+  // style project (mentions "wat op Instagram staat" without giving the handle)
+  // ends up with no Instagram link at all.
+  const allAnswerText = [...ctx.answers.values()].join(' ').toLowerCase();
+  const socialMentions: Array<{ field: string; label: string; keyword: RegExp; captured: string | null | undefined }> = [
+    { field: 'social_instagram', label: 'Instagram', keyword: /\binstagram\b|\binsta\b/, captured: business?.social_instagram },
+    { field: 'social_facebook',  label: 'Facebook',  keyword: /\bfacebook\b/,             captured: business?.social_facebook },
+    { field: 'social_linkedin',  label: 'LinkedIn',  keyword: /\blinkedin\b/,             captured: business?.social_linkedin },
+    { field: 'social_youtube',   label: 'YouTube',   keyword: /\byoutube\b/,              captured: business?.social_youtube },
+    { field: 'social_twitter',   label: 'Twitter/X', keyword: /\btwitter\b|\bx\.com\b/,   captured: business?.social_twitter },
+  ];
+  for (const m of socialMentions) {
+    const captured = m.captured?.trim();
+    if (!captured && m.keyword.test(allAnswerText)) {
+      fields.push(
+        f(m.field, `[INVULLEN: link naar je ${m.label}]`, 'text')
+      );
+    }
+  }
 
   // Suppress unused-arg warning — homePageTitle reserved for future use.
   void homePageTitle;

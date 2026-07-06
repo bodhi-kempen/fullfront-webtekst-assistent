@@ -59,6 +59,15 @@ exacte tekst van die vraag; je hoeft hem niet te genereren.
 - Niet napraten of samenvatten. Geen "Geweldig!" of "Bedankt voor je
   antwoord."
 
+## Specifieke doorvraag-regel — social media op p10q6
+Als de zojuist beantwoorde vraag p10q6 is (contactgegevens) en het antwoord
+noemt GEEN social media handle of URL, maar in de "Samenvatting van eerdere
+antwoorden" hierboven staat wél een verwijzing naar een sociaal platform
+(bijv. "wat op Instagram staat", "op onze Facebook", "via LinkedIn"), stel
+dan ÉÉN doorvraag: "Je noemde eerder [platform]. Wat is je gebruikersnaam
+of link, zodat we die op de website kunnen zetten?". Kies dit boven advance
+in dit specifieke geval.
+
 ## Bedrijfstype-bewustzijn
 Het bedrijf valt in één van drie modes (server vermeldt deze in de message):
 - service — dienstverlening (kapper, loodgieter, coach). "Probleem" is hier
