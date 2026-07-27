@@ -979,10 +979,10 @@ function checkGeenTicBegrensd(c: Content): CheckResult {
   const matches = allText.match(/geen\s+[^,.]{2,40},\s*geen\s+/gi) ?? [];
   return {
     name: 'geen_tic_begrensd',
-    passed: matches.length <= 4,
+    passed: matches.length <= 6,
     detail:
-      matches.length > 4
-        ? `${matches.length}x "geen X, geen Y" (max 4; bijv. ${matches.slice(0, 2).map((m) => `"${m.trim()}"`).join(', ')})`
+      matches.length > 6
+        ? `${matches.length}x "geen X, geen Y" (max 6; bijv. ${matches.slice(0, 2).map((m) => `"${m.trim()}"`).join(', ')})`
         : `${matches.length}x "geen X, geen Y" patroon`,
     severity: 'warning',
   };

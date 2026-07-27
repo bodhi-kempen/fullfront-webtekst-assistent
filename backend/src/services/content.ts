@@ -75,6 +75,26 @@ function nonEmpty(value: string | null | undefined, fallback: string): string {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
+/** Extract the canonical service name for each service from the first sentence
+ *  of p4_sN_q1 (the "Naam + omschrijving" answer). Called once before content
+ *  generation so both the homepage diensten section and the verdiepingspagina
+ *  receive the same fixed names and produce identical service_title values. */
+function extractCanonicalServiceNames(answers: Map<string, string>): string[] {
+  const serviceNumbers = new Set<number>();
+  for (const id of answers.keys()) {
+    const m = id.match(/^p4_s(\d+)_q\d+$/);
+    if (m) serviceNumbers.add(Number(m[1]));
+  }
+  const names: string[] = [];
+  for (const n of [...serviceNumbers].sort((a, b) => a - b)) {
+    const q1 = answers.get(`p4_s${n}_q1`) ?? '';
+    // The first sentence (before ". " or "\n") is the service name.
+    const name = q1.split(/\.\s+|\n/)[0]!.trim();
+    names.push(name.length > 60 ? name.slice(0, 60).trim() : name);
+  }
+  return names;
+}
+
 /** Build a url path from page list — '/' for home, '/<slug>' otherwise. */
 function buildUrlFor(includedPages: SuggestedPage[]) {
   const slugByType = new Map<string, string>();
@@ -720,6 +740,8 @@ async function buildContextFor(
     answers
   );
 
+  const canonicalServiceNames = extractCanonicalServiceNames(answers);
+
   const ctx: GenContext = {
     archetype: project.archetype!,
     sub_archetype: project.sub_archetype,
@@ -732,6 +754,7 @@ async function buildContextFor(
     business_name: project.business_name ?? businessInfo.business_name,
     urlFor: buildUrlFor(includedPages),
     business_info: businessInfo,
+    canonical_service_names: canonicalServiceNames.length > 0 ? canonicalServiceNames : undefined,
   };
   // Stash the page list so the footer builder can render the nav menu.
   (ctx as GenContext & { _pages?: SuggestedPage[] })._pages = includedPages;

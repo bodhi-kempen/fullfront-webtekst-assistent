@@ -23,6 +23,9 @@ export interface GenContext {
   business_info?: ParsedBusinessInfo;
   /** Optional regenerate-with-prompt instruction from the user. */
   user_instruction?: string;
+  /** Canonical service name per service (p4_s1, p4_s2, …), extracted once
+   *  before content generation so home and verdiepingspagina use identical names. */
+  canonical_service_names?: string[];
 }
 
 export interface ParsedBusinessInfo {
@@ -254,13 +257,16 @@ Maar dan MOET de bijbehorende home-sectie consistent zijn:
 - Over-pagina in eerste persoon: home-CTA = "Lees mijn verhaal"
 Sectie-titel en CTA van dezelfde sectie mogen NOOIT van perspectief verschillen.
 
-## "GEEN X, GEEN Y" — MAXIMAAL TWEE KEER
+## "GEEN X, GEEN Y" — MAXIMAAL VIER KEER
 Het patroon "geen X, geen Y" is krachtig maar verliest zijn werking bij herhaling.
-Gebruik het MAXIMAAL TWEE KEER op de hele website. Wissel daarna af:
+Gebruik het MAXIMAAL VIER KEER op de hele website. Wissel daarna af:
 - Positief: "gewoon rust en tijd" i.p.v. "geen haast, geen drukte"
 - Concreet beeld: "je zit aan je eigen keukentafel" i.p.v. "geen wachtkamer"
 - Korte constatering: "het is hier stil"
 Als je een sectie wilt openen met "Geen...", herschrijf die opening.
+Uitzondering: als de ondernemer zelf een "geen X, geen Y" formulering letterlijk
+gebruikte in het interview, mag je die overnemen — de eigen woorden van de
+ondernemer gaan altijd voor, en die reproductie telt niet mee in de limiet.
 
 ## CONCRETE DETAILS — GEBRUIK SPAARZAAM
 Een concreet menselijk detail uit het interview (kop koffie, foto's na afloop,
@@ -376,7 +382,12 @@ De hero-titel is een natuurlijke Nederlandse zin of zinsdeel, GEEN SEO-construct
 - Geen titel-opsommingen als "service • kwaliteit • [stad]".
 
 ## SUBTITEL — VERMIJD DEZE FOUTEN
-- Geen cirkelvormige zinnen: "Ik help mensen om geholpen te worden" (help→geholpen).
+- Verboden: het werkwoord "helpen" (in welke vorm dan ook) MAXIMAAL ÉÉN KEER in de subtitel.
+  FOUT: "Ik help mensen die klaar zijn met X om rustig Y geholpen te worden."
+  De combinatie help→geholpen is altijd een cirkel. Gebruik één of de ander, nooit allebei.
+- Schrijf ACTIEF, niet PASSIEF: zeg wat de klant KRIJGT of DOET, niet wat er met de klant "wordt gedaan".
+  FOUT: "…om rustig en thuis goed geholpen te worden."
+  GOED: "Ik kom naar je toe voor een rustige knipbeurt, zonder reistijd of salonlawaai."
 - Gebruik "worden" maximaal één keer per subtitel-zin.
 - Hardop-test: als de zin stroef klinkt, herschrijf.
 
@@ -754,11 +765,15 @@ ${
 ${styleByArchetype[ctx.archetype]}
 
 ## SERVICENAMEN — CANONIEK EN CONSISTENT
-De titel van elke dienst is de naam zoals de ondernemer die in het interview
+${
+  ctx.canonical_service_names && ctx.canonical_service_names.length > 0
+    ? `De servicenamen zijn VASTGESTELD. Gebruik ze LETTER VOOR LETTER als service_title.
+Verander NIETS: geen verkorting, geen toevoeging, geen parafrase.
+${ctx.canonical_service_names.map((n, i) => `${i + 1}. ${n}`).join('\n')}`
+    : `De titel van elke dienst is de naam zoals de ondernemer die in het interview
 gebruikte (eerste frase van "Naam + omschrijving" hieronder). Gebruik die naam
-LETTERLIJK op elke pagina. Verkort nooit, parafraseer nooit:
-- "Knippen met kleur" → NOOIT "Knippen met kleurbehandeling" op een andere pagina
-- "Highlights en balayage" → NOOIT alleen "Highlights"
+LETTERLIJK op elke pagina. Verkort nooit, parafraseer nooit.`
+}
 De service_title die je schrijft moet identiek zijn aan hoe de andere versie
 (home vs. verdiepingspagina) hem ook schrijft.
 
