@@ -59,6 +59,16 @@ function ans(ctx: GenContext, ...ids: string[]): string {
     .join('\n\n');
 }
 
+/** Normalise price notation so "29,50 euro" / "29.50 euro" become "€29,50".
+ *  Applied to both the input data (servicesBlock) and generator output
+ *  (generateServices, generateFaqPage) so the canonical format is enforced
+ *  even when the model copies the notation from interview answers. */
+function normalizePrices(text: string): string {
+  return text
+    .replace(/\b(\d+(?:[.,]\d+)?)\s+euro\b/gi, (_, amt) => `€${amt.replace('.', ',')}`)
+    .replace(/€\s+(\d)/g, '€$1');
+}
+
 /** Build a per-service block from all p4_s*_q* answers in context. Use this
  *  for the diensten generator so Claude sees ALL services in a structured
  *  way regardless of how many services the user described. */
@@ -93,7 +103,7 @@ function servicesBlock(ctx: GenContext): string {
     }
     blocks.push(lines.join('\n'));
   }
-  return blocks.join('\n\n');
+  return normalizePrices(blocks.join('\n\n'));
 }
 
 /** Guardrails included in every content generator's system prompt.
@@ -204,6 +214,13 @@ zonder verboden woorden.
 
 SLECHT: "Met passie en vakmanschap creëren wij unieke oplossingen."
 GOED: "We maken het gewoon goed. Daar draait het om."
+
+## PRIJSNOTATIE — STRIKT
+Schrijf prijzen ALTIJD als €XX,XX (euroteken vóór het bedrag, komma als
+decimaalteken, geen spatie tussen euroteken en bedrag).
+GOED: €29,50 — €85 — €112,50
+FOUT: 29,50 euro — 29,50 EUR — € 29,50 (spatie) — EUR 29,50
+Geldt overal: dienst-omschrijvingen, FAQ-antwoorden, hero, footer, alles.
 
 ## UNIEKE TITELS PER PAGINA — STRIKT
 Gebruik NOOIT dezelfde titel op meerdere pagina's. Elke pagina verdient een
@@ -667,7 +684,9 @@ show_pricing = ${ctx.archetype_config.show_pricing ? 'true' : 'false'}.
 ${
   ctx.archetype_config.show_pricing
     ? `Als de ondernemer een concrete prijs of prijsindicatie noemde bij een dienst, ` +
-      `verwerk die ALTIJD zichtbaar in de omschrijving (bijv. "Vanaf €39" of "€110 per behandeling"). ` +
+      `verwerk die ALTIJD zichtbaar in de omschrijving. Noteer prijzen als €XX,XX ` +
+      `(euroteken vóór, komma als decimaal, geen spatie) — bijv. "Vanaf €39" of ` +
+      `"€110 per behandeling". NOOIT "39 euro" of "€ 39". ` +
       `Laat opgegeven prijzen NOOIT weg. Ontbreekt de prijs voor een dienst terwijl ` +
       `show_pricing true is, gebruik dan letterlijk "[INVULLEN: prijs vanaf]" — ` +
       `niet "vraag naar onze prijzen" of "in overleg" als verhullend trucje.`
@@ -745,13 +764,20 @@ ${ans(ctx, 'p1q4', 'p1q5', 'p2q1', 'p2q5')}
 ${ans(ctx, 'p5q5')}
 `.trim();
 
-  return callTool<ServicesOutput>({
+  const result = await callTool<ServicesOutput>({
     systemPrompt: system,
     messages: [{ role: 'user', content: user }],
     tool: SERVICES_TOOL,
     maxTokens: 2048,
     purpose: 'content/services',
   });
+
+  // Belt-and-braces: normalize price notation in descriptions even when the
+  // model copies the "XX,XX euro" format from interview answers verbatim.
+  for (const svc of result.services) {
+    svc.description = normalizePrices(svc.description);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -1444,11 +1470,16 @@ of een neutrale formulering in het FAQ-antwoord — verzin geen waarde.
 ${servicesBlock(ctx)}
 `.trim();
 
-  return callTool<FaqOutput>({
+  const result = await callTool<FaqOutput>({
     systemPrompt: system,
     messages: [{ role: 'user', content: user }],
     tool: FAQ_TOOL,
     maxTokens: 2048,
     purpose: 'content/faq',
   });
+
+  for (const item of result.items) {
+    item.answer = normalizePrices(item.answer);
+  }
+  return result;
 }

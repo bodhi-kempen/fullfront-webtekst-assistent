@@ -306,7 +306,12 @@ async function runFixture(): Promise<{ userId: string; projectId: string; conten
         answer_text: answer,
         answer_source: 'typed',
       },
-      { label: `turn ${turn} (${q.question_id})` }
+      // maxRetries: 0 — interview/answer is stateful and non-idempotent.
+      // Retrying after a network error risks sending the same answer twice,
+      // which corrupts the server's expected-question_id and gives a 409.
+      // On any failure here we emit InfraError → exit 2 (infra) not exit 1
+      // (content regression), and CI can safely retry the whole job.
+      { label: `turn ${turn} (${q.question_id})`, maxRetries: 0 }
     );
     if (turn > MAX) throw new Error(`Aborted: > ${MAX} turns`);
   }

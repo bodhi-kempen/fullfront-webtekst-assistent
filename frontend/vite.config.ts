@@ -1,28 +1,39 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-// Hard-coded fallbacks for the public Supabase URL + anon (publishable) key.
-// Both are safe to ship in client code — the anon key is, by design, a
-// public credential gated by Row Level Security on the database side.
+// Validate Supabase env vars at build time and fail loudly if they're missing.
+// loadEnv() merges .env files + process.env, so this works for both:
+//   local dev:  VITE_SUPABASE_* in frontend/.env (gitignored)
+//   Railway:    VITE_SUPABASE_* as env vars on the frontend service
 //
-// Why: Railway's Docker build doesn't reliably forward service env vars at
-// build time, which left the production bundle without Supabase config and
-// React failed to render. Falling back to known-good values guarantees the
-// app boots even if `VITE_*` vars are missing in the build environment.
-const SUPABASE_URL_FALLBACK = 'https://rttqlpnsybdkhllslwwe.supabase.co';
-const SUPABASE_ANON_KEY_FALLBACK = 'sb_publishable_YbgUyg8EPSS8gWDZaxLhrA_X3kyUtqM';
+// Without this check a missing var silently produces a white screen in
+// production — the error should appear in the build log, not at runtime.
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5173,
-  },
-  define: {
-    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(
-      process.env.VITE_SUPABASE_URL || SUPABASE_URL_FALLBACK
-    ),
-    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
-      process.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY_FALLBACK
-    ),
-  },
+  const supabaseUrl = env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    const missing = [
+      !supabaseUrl && 'VITE_SUPABASE_URL',
+      !supabaseAnonKey && 'VITE_SUPABASE_ANON_KEY',
+    ].filter(Boolean);
+    console.error(
+      `\n✗ Build afgebroken: VITE_SUPABASE_ANON_KEY ontbreekt tijdens build — zet deze in Railway env vars (frontend service) of in frontend/.env voor lokale builds.\n` +
+        `  Ontbrekende variabelen: ${missing.join(', ')}\n`
+    );
+    process.exit(1);
+  }
+
+  return {
+    plugins: [react()],
+    server: {
+      port: 5173,
+    },
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
+    },
+  };
 });
