@@ -891,6 +891,180 @@ function checkOverPageLength(c: Content): CheckResult {
   };
 }
 
+// ---- New hard checks ----
+
+function checkVakjargonNietVertaald(c: Content): CheckResult {
+  const VERBODEN_VERTALINGEN = ['hoogtepunten', 'veegtechniek'];
+  const hits: string[] = [];
+  for (const f of allFieldValues(c)) {
+    const v = stripPlaceholders(f.value).toLowerCase();
+    for (const term of VERBODEN_VERTALINGEN) {
+      if (new RegExp(`\\b${term}\\b`).test(v)) {
+        hits.push(`"${term}" in ${f.page}/${f.section}/${f.field}`);
+      }
+    }
+  }
+  return {
+    name: 'vakjargon_niet_vertaald',
+    passed: hits.length === 0,
+    detail: hits.slice(0, 3).join(' | ') || undefined,
+    severity: 'hard',
+  };
+}
+
+function checkNaamOnbekendPlaceholder(c: Content): CheckResult {
+  const hits: string[] = [];
+  for (const f of allFieldValues(c)) {
+    if (/naam\s+onbekend/i.test(f.value)) {
+      hits.push(`${f.page}/${f.section}/${f.field}: "${f.value.slice(0, 60)}"`);
+    }
+  }
+  return {
+    name: 'naam_onbekend_placeholder',
+    passed: hits.length === 0,
+    detail: hits.slice(0, 3).join(' | ') || undefined,
+    severity: 'hard',
+  };
+}
+
+// ---- New warnings ----
+
+function checkServicenamenCanoniek(c: Content): CheckResult {
+  const home = homePage(c);
+  if (!home) return { name: 'servicenamen_canoniek', passed: true, detail: 'geen home-pagina', severity: 'warning' };
+
+  const homeTitles: string[] = [];
+  for (const s of home.sections) {
+    if (s.section_type !== 'diensten') continue;
+    for (const [, group] of fieldsBySort(s)) {
+      const t = group['service_title'];
+      if (t && !/\[INVULLEN/i.test(t)) homeTitles.push(t.trim());
+    }
+  }
+  if (homeTitles.length === 0) {
+    return { name: 'servicenamen_canoniek', passed: true, detail: 'geen service_title velden op home', severity: 'warning' };
+  }
+
+  const verdieping = c.pages.find(
+    (p) => p.slug !== '' && p.slug !== 'home' && p.sections.some((s) => s.section_type === 'diensten')
+  );
+  if (!verdieping) {
+    return { name: 'servicenamen_canoniek', passed: true, detail: 'geen diensten-verdiepingspagina — check nvt', severity: 'warning' };
+  }
+
+  const verdiepingTitles: string[] = [];
+  for (const s of verdieping.sections) {
+    if (s.section_type !== 'diensten') continue;
+    for (const [, group] of fieldsBySort(s)) {
+      const t = group['service_title'];
+      if (t && !/\[INVULLEN/i.test(t)) verdiepingTitles.push(t.trim());
+    }
+  }
+
+  const mismatches = homeTitles.filter(
+    (t) => !verdiepingTitles.some((vt) => vt.toLowerCase() === t.toLowerCase())
+  );
+  return {
+    name: 'servicenamen_canoniek',
+    passed: mismatches.length === 0,
+    detail: mismatches.length
+      ? `Home-titels niet letterlijk op ${verdieping.slug}: ${mismatches.slice(0, 3).join(', ')}`
+      : `${homeTitles.length} servicenamen consistent (home ↔ ${verdieping.slug})`,
+    severity: 'warning',
+  };
+}
+
+function checkGeenTicBegrensd(c: Content): CheckResult {
+  const allText = allFieldValues(c).map((f) => f.value).join('\n');
+  const matches = allText.match(/geen\s+[^,.]{2,40},\s*geen\s+/gi) ?? [];
+  return {
+    name: 'geen_tic_begrensd',
+    passed: matches.length <= 4,
+    detail:
+      matches.length > 4
+        ? `${matches.length}x "geen X, geen Y" (max 4; bijv. ${matches.slice(0, 2).map((m) => `"${m.trim()}"`).join(', ')})`
+        : `${matches.length}x "geen X, geen Y" patroon`,
+    severity: 'warning',
+  };
+}
+
+function checkDetailNietOvergebruikt(c: Content): CheckResult {
+  const allText = allFieldValues(c).map((f) => f.value).join('\n');
+  const count = (allText.match(/\bkoffie\b/gi) ?? []).length;
+  return {
+    name: 'detail_niet_overgebruikt',
+    passed: count <= 2,
+    detail:
+      count > 2
+        ? `"koffie" ${count}x (max 2 — concreet detail wordt tic bij herhaling)`
+        : `"koffie" ${count}x`,
+    severity: 'warning',
+  };
+}
+
+function checkHeroTitelNatuurlijk(c: Content): CheckResult {
+  const home = homePage(c);
+  if (!home) return { name: 'hero_titel_natuurlijk', passed: true, detail: 'geen home-pagina', severity: 'warning' };
+  const hero = home.sections.find((s) => s.section_type === 'hero');
+  if (!hero) return { name: 'hero_titel_natuurlijk', passed: true, detail: 'geen hero-sectie', severity: 'warning' };
+  const title = hero.fields.find((f) => f.field_name === 'title')?.field_value;
+  if (!title) return { name: 'hero_titel_natuurlijk', passed: true, detail: 'geen title in hero', severity: 'warning' };
+  // Detect SEO city-append: title ending with ", Plaatsnaam" (comma + single capitalized word)
+  const isSeoAppend = /,\s*[A-ZÀ-Ÿ][a-zà-ÿ]+\s*$/.test(title);
+  return {
+    name: 'hero_titel_natuurlijk',
+    passed: !isSeoAppend,
+    detail: isSeoAppend ? `Hero-titel eindigt als SEO-append: "${title}"` : `"${title}"`,
+    severity: 'warning',
+  };
+}
+
+function checkVertelperspectiefConsistent(c: Content): CheckResult {
+  const problems: string[] = [];
+  const overPg = overPage(c);
+  // "Ze reageert" / "Zij werkt" etc. in first-person contexts outside the Over page
+  const thirdPersonVerb =
+    /\b(ze|zij)\s+(reageert|neemt|stuurt|werkt|doet|heeft|biedt|helpt|ziet|rijdt|plant|bevestigt|mailt|is\s+er)\b/i;
+
+  for (const p of c.pages) {
+    if (overPg && p.id === overPg.id) continue;
+    for (const s of p.sections) {
+      for (const f of s.fields) {
+        if (!['confirmation_message', 'intro', 'title', 'subtitle', 'form_trigger'].includes(f.field_name)) continue;
+        if (thirdPersonVerb.test(stripPlaceholders(f.value))) {
+          problems.push(`${p.slug || 'home'}/${s.section_type}/${f.field_name}: derde persoon buiten Over-pagina`);
+        }
+      }
+    }
+  }
+
+  // Also flag perspective clash inside the home Over-sectie (title vs CTA)
+  const home = homePage(c);
+  if (home) {
+    const overSec = home.sections.find((s) => s.section_type === 'over' || s.section_type === 'over_short');
+    if (overSec) {
+      const byName = Object.fromEntries(overSec.fields.map((f) => [f.field_name, f.field_value]));
+      const title = byName['title'] ?? '';
+      const cta = byName['cta_text'] ?? '';
+      const titleIsThirdPerson = /\bover\s+[A-ZÀ-Ÿ][a-zà-ÿ]+\b/i.test(title);
+      const ctaIsFirstPerson = /\bmijn\b/i.test(cta);
+      const ctaIsThirdPerson = /\bvan\s+[A-ZÀ-Ÿ][a-zà-ÿ]+\b/i.test(cta) || /\bhaar\s+verhaal\b/i.test(cta);
+      if (titleIsThirdPerson && ctaIsFirstPerson) {
+        problems.push(`Home/over: titel derde persoon ("${title}") maar CTA eerste persoon ("${cta}")`);
+      } else if (!titleIsThirdPerson && ctaIsThirdPerson) {
+        problems.push(`Home/over: titel eerste persoon ("${title}") maar CTA derde persoon ("${cta}")`);
+      }
+    }
+  }
+
+  return {
+    name: 'vertelperspectief_consistent',
+    passed: problems.length === 0,
+    detail: problems.slice(0, 3).join(' | ') || undefined,
+    severity: 'warning',
+  };
+}
+
 // ---- Warnings ----
 
 function checkSpellingDt(c: Content): CheckResult {
@@ -1009,6 +1183,7 @@ function checkPrijsnotatieConsistent(c: Content): CheckResult {
 const CHECKS: Check[] = [
   // Fabrication prevention
   checkNoForbiddenWords,
+  checkVakjargonNietVertaald,
   checkNameCorrect,
   checkNoFabricatedFaq,
   checkWebshopNotFact,
@@ -1016,6 +1191,7 @@ const CHECKS: Check[] = [
   checkRealQuotePresent,
   checkNoSynthesizedQuote,
   checkTestimonialsConsistent,
+  checkNaamOnbekendPlaceholder,
   // Prijzen & compleetheid
   checkPricesPresent,
   checkPlaceholdersPresent,
@@ -1032,6 +1208,11 @@ const CHECKS: Check[] = [
   checkTargetGroupsCovered,
   checkIntroLength,
   checkPrijsnotatieConsistent,
+  checkServicenamenCanoniek,
+  checkGeenTicBegrensd,
+  checkDetailNietOvergebruikt,
+  checkHeroTitelNatuurlijk,
+  checkVertelperspectiefConsistent,
 ];
 
 // ---------------------------------------------------------------------------

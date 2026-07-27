@@ -154,6 +154,16 @@ zodat het opvalt en niet ongemerkt live gaat. Voorbeelden:
 - "[INVULLEN: telefoonnummer]"
 NIET "Vraag naar onze prijzen" of "in onze regio" als trucje om een gat
 te verbergen.
+
+### Geen productclaims zonder bron
+Doe geen beloftes over product- of behandeleigenschappen die de ondernemer
+niet letterlijk noemde:
+- NIET: claims over geur, allergie-vriendelijkheid, duurzaamheid, houdbaarheid
+  of vergelijkbare producteigenschappen tenzij ze letterlijk in het interview staan
+- WEL: alleen wat de ondernemer zelf formuleerde
+Voorbeeld: "Ik gebruik kleuren van een vakmerk met goede ingrediënten" (uit het
+interview) mag je herhalen. "Geen scherpe geur" of "huidvriendelijk" — die de
+ondernemer niet noemde — mag je NIET afleiden en als claim opnemen.
 `.trim();
 }
 
@@ -221,6 +231,42 @@ decimaalteken, geen spatie tussen euroteken en bedrag).
 GOED: €29,50 — €85 — €112,50
 FOUT: 29,50 euro — 29,50 EUR — € 29,50 (spatie) — EUR 29,50
 Geldt overal: dienst-omschrijvingen, FAQ-antwoorden, hero, footer, alles.
+
+## VAKJARGON BLIJFT VAKJARGON
+Gebruik behandelingsnamen en vakjargon zoals de ondernemer en de klant ze
+kennen. Vertaal NOOIT een vakterm naar een Nederlands synoniem:
+- highlights → NOOIT "hoogtepunten"
+- balayage → NOOIT "veegtechniek"
+- permanent → blijft "permanent"
+- coupe → blijft "coupe"
+- föhnen → blijft "föhnen"
+Gebruik de term zoals de ondernemer hem in het interview gebruikte.
+
+## ÉÉN VERTELPERSPECTIEF — HELE WEBSITE
+Kies één vertelperspectief en houd dat overal vol. Voor een eenpersoonsbedrijf
+met je-aanspreekvorm: IK-VORM. De ondernemer spreekt zelf, op elke pagina:
+- "Stuur me een berichtje" (niet "Stuur [naam] een berichtje")
+- "Ik reageer zo snel mogelijk" (niet "Ze reageert zo snel mogelijk")
+- "Plan een afspraak bij mij" (niet "bij haar")
+UITZONDERING: de Over-pagina MAG als enige in de derde persoon verteld worden.
+Maar dan MOET de bijbehorende home-sectie consistent zijn:
+- Over-pagina in derde persoon: home-CTA = "Lees het verhaal van [naam]"
+- Over-pagina in eerste persoon: home-CTA = "Lees mijn verhaal"
+Sectie-titel en CTA van dezelfde sectie mogen NOOIT van perspectief verschillen.
+
+## "GEEN X, GEEN Y" — MAXIMAAL TWEE KEER
+Het patroon "geen X, geen Y" is krachtig maar verliest zijn werking bij herhaling.
+Gebruik het MAXIMAAL TWEE KEER op de hele website. Wissel daarna af:
+- Positief: "gewoon rust en tijd" i.p.v. "geen haast, geen drukte"
+- Concreet beeld: "je zit aan je eigen keukentafel" i.p.v. "geen wachtkamer"
+- Korte constatering: "het is hier stil"
+Als je een sectie wilt openen met "Geen...", herschrijf die opening.
+
+## CONCRETE DETAILS — GEBRUIK SPAARZAAM
+Een concreet menselijk detail uit het interview (kop koffie, foto's na afloop,
+proefstuk vooraf, keukentafel) gebruik je MAXIMAAL TWEE KEER op de hele
+website. Drie keer hetzelfde detail maakt het een tic. Kies de plek waar
+het het meest op zijn plek is, gebruik het daar, en laat het daarna staan.
 
 ## UNIEKE TITELS PER PAGINA — STRIKT
 Gebruik NOOIT dezelfde titel op meerdere pagina's. Elke pagina verdient een
@@ -322,6 +368,17 @@ Je schrijft de hero-sectie van een homepage volgens het Fullfront hulpdocument.
 ## CTA
 De cta_text is de website-brede primaire CTA: "${ctx.primary_cta}".
 Gebruik die letterlijk, of een kortere variant van max 4 woorden.
+
+## HERO-TITEL — NATUURLIJKE FORMULERING (geen SEO)
+De hero-titel is een natuurlijke Nederlandse zin of zinsdeel, GEEN SEO-constructie.
+- Plak NOOIT een plaatsnaam met een komma achter de titel ("Kapper thuis, Utrecht").
+  Verwerk de plaats in de zin ("Kapper aan huis in Utrecht") of laat hem in de subtitel.
+- Geen titel-opsommingen als "service • kwaliteit • [stad]".
+
+## SUBTITEL — VERMIJD DEZE FOUTEN
+- Geen cirkelvormige zinnen: "Ik help mensen om geholpen te worden" (help→geholpen).
+- Gebruik "worden" maximaal één keer per subtitel-zin.
+- Hardop-test: als de zin stroef klinkt, herschrijf.
 
 ${accuracyBlock(ctx)}
 
@@ -696,8 +753,17 @@ ${
 ## Stijl per item (archetype: ${ctx.archetype})
 ${styleByArchetype[ctx.archetype]}
 
+## SERVICENAMEN — CANONIEK EN CONSISTENT
+De titel van elke dienst is de naam zoals de ondernemer die in het interview
+gebruikte (eerste frase van "Naam + omschrijving" hieronder). Gebruik die naam
+LETTERLIJK op elke pagina. Verkort nooit, parafraseer nooit:
+- "Knippen met kleur" → NOOIT "Knippen met kleurbehandeling" op een andere pagina
+- "Highlights en balayage" → NOOIT alleen "Highlights"
+De service_title die je schrijft moet identiek zijn aan hoe de andere versie
+(home vs. verdiepingspagina) hem ook schrijft.
+
 ## Regels per item
-- Titel = naam van de dienst/product, zoals de ondernemer hem noemde
+- Titel = CANONIEKE naam van de dienst (zie SERVICENAMEN-regel hierboven)
 - Subtitel = max 15 woorden, concreter wat het is
 - Omschrijving = ${options.isFullPage ? '80-130 woorden' : '40-60 woorden'}, per archetype-stijl
 - CTA = max 5 woorden, past bij de gebruiks-context (homepage soft, pagina meer richting actie)
@@ -988,6 +1054,14 @@ Vul de hele set als placeholders zoals in CASE B, met intro:
 title van het EERSTE item toe:
 "[NOTITIE VOOR ONDERNEMER: Vul hier echte klantervaringen in. Verzonnen
 reviews zijn juridisch en reputationeel riskant.]"
+
+### Ontbrekende klantgegevens — NOOIT "naam onbekend"
+Als de naam of context van de klant ontbreekt bij een echte quote (CASE A),
+schrijf dan NOOIT "naam onbekend", "anoniem" of een vergelijkbare letterlijke
+formulering in het subtitle-veld. Dit gaat zo live als zichtbare tekst.
+Gebruik altijd de placeholder-conventie:
+subtitle: "[INVULLEN: naam en context van de klant die dit zei, bijv. Lisa,
+38 jaar, of Teamleider in Amsterdam]"
 
 ### Ankerregel voor quotes — STRIKT
 Schrijf NOOIT een first-person quote tenzij de ondernemer die specifieke
@@ -1405,6 +1479,18 @@ Je schrijft een FAQ-pagina${ctx.archetype === 'webshop' ? ' (Klantenservice voor
 Genereer 6-10 realistische, concrete vragen die klanten van dit type bedrijf
 daadwerkelijk stellen. Geen generieke vragen ("Wat doen jullie?"). De vragen
 moeten oplossingen bieden voor reële drempels.
+
+## DEDUPLICEER — GEEN DUBBELE VRAGEN
+Elke FAQ-vraag behandelt een EIGEN onderwerp. Als twee conceptvragen hetzelfde
+antwoord zouden krijgen, voeg ze samen tot één vraag.
+
+Elk antwoord beantwoordt ALLEEN de gestelde vraag. Verwerk een misverstand of
+bijkomend onderwerp NIET als bijzin in een niet-gerelateerd antwoord — geef
+het een eigen vraag als het relevant genoeg is.
+
+Een concreet detail uit het interview (bijv. het koffie-moment bij de eerste
+afspraak) gebruik je MAXIMAAL ÉÉN KEER in de FAQ. Kies de vraag waar het
+het meest op zijn plek is en laat het weg in alle andere antwoorden.
 
 ## Onderwerpen voor dit archetype
 ${topicsByArchetype[ctx.archetype]}
