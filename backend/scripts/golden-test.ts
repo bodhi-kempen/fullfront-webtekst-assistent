@@ -1031,7 +1031,7 @@ function checkVertelperspectiefConsistent(c: Content): CheckResult {
     for (const s of p.sections) {
       for (const f of s.fields) {
         if (!['confirmation_message', 'intro', 'title', 'subtitle', 'form_trigger'].includes(f.field_name)) continue;
-        if (thirdPersonVerb.test(stripPlaceholders(f.value))) {
+        if (thirdPersonVerb.test(stripPlaceholders(f.value ?? ''))) {
           problems.push(`${p.slug || 'home'}/${s.section_type}/${f.field_name}: derde persoon buiten Over-pagina`);
         }
       }
