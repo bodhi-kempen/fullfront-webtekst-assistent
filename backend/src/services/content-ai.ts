@@ -998,13 +998,16 @@ GEEN quote — die hoort onder CASE A½ met een placeholder voor de quote.
 aanhalingstekens zet.
 
 ### Quote-lengte
-${options.isFullPage ? '80-120 woorden per echte quote' : '40-80 woorden per echte quote'}.
+${options.isFullPage ? '80-120 woorden per echte quote — maar UITZONDERING: als de klant slechts één korte zin gaf (CASE A), gebruik die zin EXACT en breid hem NIET uit. De word-count richtlijn is voor synthesized of langere bestaande quotes, niet voor letterlijke korte klantquotes.' : '40-80 woorden per echte quote'}.
 Placeholders blijven kort — alleen de invul-instructie tussen [INVULLEN: ...].
 
 ### Consistentie tussen pagina's
 Eén set klantverhalen telt voor de hele website. Gebruik EXACT dezelfde
 namen en quotes overal waar testimonials voorkomen. Verzin niet per
 pagina nieuwe varianten.
+CRUCIAAL: als de klant slechts één zin gaf (CASE A), staat die zin
+LETTERLIJK gelijk op zowel de homepage als de ervaringen-pagina.
+Schrijf geen langere versie op de verdiepingspagina — gebruik dezelfde zin.
 
 ${accuracyBlock(ctx)}
 

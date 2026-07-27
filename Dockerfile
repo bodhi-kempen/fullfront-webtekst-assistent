@@ -17,6 +17,15 @@ COPY backend/package*.json backend/
 # is already set in the build environment.
 RUN npm install --include=dev
 
+# Vite bakes VITE_* env vars into the bundle at build time, so they must be
+# present during `RUN npm run build`, not just at runtime. Railway passes
+# service variables as Docker build-args when a matching ARG exists; the ENV
+# instruction then exposes them to the build process via process.env.
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+
 # Now copy the rest of the source and build.
 COPY . .
 RUN npm run build

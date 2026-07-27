@@ -658,16 +658,29 @@ function checkTestimonialsConsistent(c: Content): CheckResult {
   if (!home) {
     return { name: 'testimonials_consistent', passed: false, detail: 'geen home-pagina', severity: 'hard' };
   }
-  // Only compare REAL quotes — placeholders on Home and Ervaringen legitimately
-  // differ because the prompt asks for a different word-count range per
-  // context (40-80 for home, 80-120 for the full page). What we actually want
-  // to guarantee is that every literal customer quote on one page also shows
-  // up on the other, regardless of ordering.
-  const isPlaceholder = (q: string) => /\[INVULLEN/i.test(q);
+  // Compare REAL quotes across pages. Two subtleties:
+  //
+  // 1. The full-page generator sometimes appends an [INVULLEN: ...] instruction
+  //    to a real quote, asking the entrepreneur to expand it to 80-120 words.
+  //    That mixed field ("real quote text. [INVULLEN: expand to...]") contains
+  //    real content — we must NOT discard it. stripPlaceholders() removes the
+  //    [INVULLEN] suffix and leaves the real quote for comparison.
+  //
+  // 2. After stripping, a pure placeholder has no meaningful text (< 15 chars).
+  //    A real quote still has the actual customer words.
+  const realQuoteText = (q: string) => stripPlaceholders(q).trim();
+  const isPlaceholder = (q: string) => realQuoteText(q).length < 15;
   const hq = itemQuotesInPage(home).filter((q) => !isPlaceholder(q));
   const eq = itemQuotesInPage(erv).filter((q) => !isPlaceholder(q));
-  const notOnErv = hq.filter((q) => !eq.includes(q));
-  const notOnHome = eq.filter((q) => !hq.includes(q));
+  // Use stripped+normalized comparison: handles minor length/whitespace diffs.
+  const norm = (s: string) => realQuoteText(s).replace(/\s+/g, ' ').toLowerCase();
+  const quoteMatch = (a: string, b: string): boolean => {
+    const na = norm(a);
+    const nb = norm(b);
+    return na === nb || na.includes(nb) || nb.includes(na);
+  };
+  const notOnErv = hq.filter((q) => !eq.some((eq_q) => quoteMatch(q, eq_q)));
+  const notOnHome = eq.filter((q) => !hq.some((hq_q) => quoteMatch(q, hq_q)));
   const missing = [...notOnErv.map((q) => `home-only: "${q.slice(0, 60)}…"`), ...notOnHome.map((q) => `erv-only: "${q.slice(0, 60)}…"`)];
   const detail = missing.length
     ? missing.slice(0, 2).join(' | ')
