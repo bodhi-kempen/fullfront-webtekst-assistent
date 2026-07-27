@@ -960,6 +960,34 @@ function checkIntroLength(c: Content): CheckResult {
   };
 }
 
+function checkPrijsnotatieConsistent(c: Content): CheckResult {
+  // Flags when both "€29,50" (prefix) and "29,50 euro" (suffix) styles appear
+  // in the same output — the content generator should pick one and stick to it.
+  const withEuroPrefix: string[] = [];
+  const withEuroSuffix: string[] = [];
+
+  for (const f of allFieldValues(c)) {
+    const v = stripPlaceholders(f.value);
+    const loc = `${f.page}/${f.section}/${f.field}`;
+    if (/€\s*\d+[,.]?\d*/.test(v)) withEuroPrefix.push(loc);
+    if (/\b\d+[,.]?\d*\s*euro\b/i.test(v)) withEuroSuffix.push(loc);
+  }
+
+  const mixed = withEuroPrefix.length > 0 && withEuroSuffix.length > 0;
+  return {
+    name: 'prijsnotatie_consistent',
+    passed: !mixed,
+    detail: mixed
+      ? `gemengd: €-prefix in [${withEuroPrefix.slice(0, 3).join(', ')}]; euro-suffix in [${withEuroSuffix.slice(0, 3).join(', ')}]`
+      : withEuroPrefix.length
+        ? `${withEuroPrefix.length} veld(en) met €-prefix`
+        : withEuroSuffix.length
+          ? `${withEuroSuffix.length} veld(en) met euro-suffix`
+          : 'geen prijzen gevonden',
+    severity: 'warning',
+  };
+}
+
 const CHECKS: Check[] = [
   // Fabrication prevention
   checkNoForbiddenWords,
@@ -985,6 +1013,7 @@ const CHECKS: Check[] = [
   checkConcreteDetail,
   checkTargetGroupsCovered,
   checkIntroLength,
+  checkPrijsnotatieConsistent,
 ];
 
 // ---------------------------------------------------------------------------
