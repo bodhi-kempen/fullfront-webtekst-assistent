@@ -89,8 +89,13 @@ function extractCanonicalServiceNames(answers: Map<string, string>): string[] {
   for (const n of [...serviceNumbers].sort((a, b) => a - b)) {
     const q1 = answers.get(`p4_s${n}_q1`) ?? '';
     // The first sentence (before ". " or "\n") is the service name.
-    const name = q1.split(/\.\s+|\n/)[0]!.trim();
-    names.push(name.length > 60 ? name.slice(0, 60).trim() : name);
+    let name = q1.split(/\.\s+|\n/)[0]!.trim();
+    if (name.length > 60) name = name.slice(0, 60).trim();
+    // Strip a leading Dutch article (first word only) and re-capitalise.
+    name = name.replace(/^(?:een|de|het)\s+([a-zA-ZÀ-ÿ])/i, (_, firstChar) =>
+      firstChar.toUpperCase()
+    );
+    names.push(name);
   }
   return names;
 }
