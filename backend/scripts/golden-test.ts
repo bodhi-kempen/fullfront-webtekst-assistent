@@ -1106,7 +1106,7 @@ function checkSpellingDt(c: Content): CheckResult {
   // Optional adverb cluster between subject and verb (max 2).
   // Includes "echt" / "heel" / "erg" / "wel" / "zeker" which commonly appear
   // between "iemand die" and the verb: "iemand die echt luister naar je".
-  const ADV = '(?:\\s+(?:ook|dan|nu|al|zelfs|gewoon|altijd|soms|vaak|nog|direct|meteen|echt|heel|erg|wel|zeker|eigenlijk|gewoon|juist)){0,2}';
+  const ADV = '(?:\\s+(?:ook|dan|nu|al|zelfs|gewoon|altijd|soms|vaak|nog|direct|meteen|echt|heel|erg|wel|zeker|eigenlijk|juist|hier)){0,2}';
 
   const suspects: string[] = [];
   for (const f of allFieldValues(c)) {
