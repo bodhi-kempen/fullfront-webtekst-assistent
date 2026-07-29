@@ -49,6 +49,10 @@ interface UsageContext {
   projectId: string | null;
   /** Skip budget check (admin recovery flows). Usage is still logged. */
   bypassBudget?: boolean;
+  /** In-memory accumulator for per-run spend. Set at the start of generateAllContent(). */
+  runSpentUsd?: number;
+  /** Per-run cap in USD. Throw RunBudgetExceededError when runSpentUsd exceeds this. */
+  runBudgetUsd?: number;
 }
 
 const storage = new AsyncLocalStorage<UsageContext>();
@@ -74,50 +78,96 @@ export function setProjectInContext(projectId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Budget check + logging
+// Budget errors
 // ---------------------------------------------------------------------------
 
+/** Thrown when the user's 30-day rolling spend exceeds BUDGET_CAP_USD.
+ *  Returns HTTP 402 from the error middleware. */
 export class BudgetExceededError extends Error {
   status = 402;
   constructor(public spentUsd: number, public limitUsd: number) {
     super(
-      `Gebruikslimiet bereikt: $${spentUsd.toFixed(2)} van $${limitUsd.toFixed(
-        2
-      )} verbruikt.`
+      'Je hebt het maximum aan AI-generaties voor deze periode bereikt. ' +
+      'Neem contact op met Fullfront om verder te gaan.'
     );
     this.name = 'BudgetExceededError';
   }
 }
 
-/** Throws BudgetExceededError if the user has exceeded MAX_USAGE_USD_PER_USER. */
+/** Thrown inside generateAllContent() when a single run exceeds BUDGET_RUN_CAP_USD.
+ *  Caught by startContentGeneration()'s catch block — never returned as HTTP. */
+export class RunBudgetExceededError extends Error {
+  constructor(public spentUsd: number, public limitUsd: number) {
+    super(
+      `Generatie afgebroken: runbudget overschreden ` +
+      `($${spentUsd.toFixed(3)} van $${limitUsd.toFixed(2)} per run)`
+    );
+    this.name = 'RunBudgetExceededError';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Budget check
+// ---------------------------------------------------------------------------
+
+/**
+ * Rolling-window budget check: sums cost_usd for this user from
+ *   GREATEST(now() - 30 days, last budget_reset for this user)
+ * to now. Throws BudgetExceededError if the total >= BUDGET_CAP_USD.
+ */
 export async function assertWithinBudget(): Promise<void> {
   const ctx = storage.getStore();
-  if (!ctx || env.maxUsageUsdPerUser <= 0) return;
+  if (!ctx || env.budgetCapUsd <= 0) return;
   if (ctx.bypassBudget) return;
-  // UNLIMITED_BUDGET_USERS list — Fullfront's own staff/internal users get
-  // unlimited spend; everyone else stays gated by maxUsageUsdPerUser.
   if (env.unlimitedBudgetUsers.includes(ctx.userId)) return;
 
+  // Step 1: find the most recent manual reset for this user (if any).
+  const { data: resetData, error: resetErr } = await supabaseAdmin
+    .from('budget_resets')
+    .select('reset_at')
+    .eq('user_id', ctx.userId)
+    .order('reset_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (resetErr) {
+    console.error('[usage] budget_resets query failed', resetErr);
+    // fail open — don't block users on a telemetry error
+  }
+
+  // Step 2: window start = GREATEST(now() - 30 days, last reset_at)
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const lastResetAt = resetData?.reset_at ?? null;
+  const windowStart =
+    lastResetAt && lastResetAt > thirtyDaysAgo ? lastResetAt : thirtyDaysAgo;
+
+  // Step 3: sum usage since window start.
   const { data, error } = await supabaseAdmin
     .from('claude_usage')
     .select('cost_usd')
-    .eq('user_id', ctx.userId);
+    .eq('user_id', ctx.userId)
+    .gt('created_at', windowStart);
 
   if (error) {
     console.error('[usage] budget check query failed', error);
-    return; // fail open — don't block users on a telemetry error
+    return; // fail open
   }
 
   const spent = (data ?? []).reduce(
     (sum, row) => sum + Number(row.cost_usd ?? 0),
     0
   );
-  if (spent >= env.maxUsageUsdPerUser) {
-    throw new BudgetExceededError(spent, env.maxUsageUsdPerUser);
+  if (spent >= env.budgetCapUsd) {
+    throw new BudgetExceededError(spent, env.budgetCapUsd);
   }
 }
 
-/** Log one Claude call's usage. Failure is logged but never thrown. */
+// ---------------------------------------------------------------------------
+// Usage logging (+ per-run guard)
+// ---------------------------------------------------------------------------
+
+/** Log one Claude call's usage. Also advances the in-memory run spend counter
+ *  and throws RunBudgetExceededError if the run cap is exceeded. */
 export async function logUsage(opts: {
   purpose: string;
   model: string;
@@ -144,5 +194,14 @@ export async function logUsage(opts: {
   });
   if (error) {
     console.error('[usage] insert failed', error);
+  }
+
+  // Per-run guard: check AFTER this call completes (never mid-call).
+  // Bypassed for admin recovery flows.
+  if (ctx.runBudgetUsd !== undefined && !ctx.bypassBudget) {
+    ctx.runSpentUsd = (ctx.runSpentUsd ?? 0) + cost;
+    if (ctx.runSpentUsd > ctx.runBudgetUsd) {
+      throw new RunBudgetExceededError(ctx.runSpentUsd, ctx.runBudgetUsd);
+    }
   }
 }

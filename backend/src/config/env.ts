@@ -133,7 +133,12 @@ export const env = {
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
   anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6',
-  // Per-user lifetime spend cap on Claude (USD). Set to 0 to disable.
-  // Default $3 ≈ €2,80 — enough for ~3 complete projects at current usage.
-  maxUsageUsdPerUser: Number(process.env.MAX_USAGE_USD_PER_USER ?? 3),
+  // Per-user rolling-window cap (USD per 30 days). Set to 0 to disable.
+  // Default $5 — covers 3 full projects (median $1.65 each) with room.
+  // Replaces the old MAX_USAGE_USD_PER_USER lifetime cap.
+  budgetCapUsd: Number(process.env.BUDGET_CAP_USD ?? 5),
+  // Per-generation-run hard ceiling (USD). Aborts the run after the current
+  // API call if cumulative run cost exceeds this. Normal runs cost ~$0.27;
+  // this guard should never fire in regular usage. Set to 0 to disable.
+  budgetRunCapUsd: Number(process.env.BUDGET_RUN_CAP_USD ?? 1),
 };

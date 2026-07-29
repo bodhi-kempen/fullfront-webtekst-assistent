@@ -1,4 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
+import { env } from '../config/env.js';
+import { getUsageContext, RunBudgetExceededError } from '../lib/usage.js';
 import type { Archetype } from '../data/questions.js';
 import {
   generateBlogPage,
@@ -798,6 +800,14 @@ export async function generateAllContent(projectId: string): Promise<void> {
   // fails, the catch in startContentGeneration writes a fresh message.
   await setLastContentError(projectId, null);
 
+  // Arm the per-run budget guard. Normal runs cost ~$0.27; this fires only
+  // if something is badly wrong. bypassBudget=true (admin recovery) disables it.
+  const runCtx = getUsageContext();
+  if (runCtx && !runCtx.bypassBudget && env.budgetRunCapUsd > 0) {
+    runCtx.runSpentUsd = 0;
+    runCtx.runBudgetUsd = env.budgetRunCapUsd;
+  }
+
   const { ctx, strategy } = await buildContextFor(projectId);
   await deleteExistingPages(projectId);
 
@@ -840,7 +850,12 @@ export function startContentGeneration(projectId: string): void {
     // UI) can see WHY their generation halted, not just that it did. We
     // truncate to a reasonable length to avoid blowing up the column on
     // huge stack traces from Anthropic API errors.
-    const rawMessage = err instanceof Error ? err.message : String(err);
+    let rawMessage = err instanceof Error ? err.message : String(err);
+    // RunBudgetExceededError: the detailed amounts are useful for debugging
+    // but the last_content_error shown to users should be the clean message.
+    if (err instanceof RunBudgetExceededError) {
+      rawMessage = 'Generatie afgebroken: runbudget overschreden';
+    }
     const message = rawMessage.length > 800 ? rawMessage.slice(0, 800) + '…' : rawMessage;
     try {
       await setLastContentError(projectId, message);

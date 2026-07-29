@@ -5,6 +5,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { getPagesWithContent, startContentGeneration } from '../services/content.js';
 import { getStrategy } from '../services/strategy.js';
 import { withUsageContext } from '../lib/usage.js';
+import { env } from '../config/env.js';
 
 // ---------------------------------------------------------------------------
 // CSV helpers — RFC 4180 escaping. UTF-8 BOM prefix so Excel auto-detects
@@ -339,6 +340,101 @@ adminRouter.get('/export/projects/:id/full.csv', async (req, res, next) => {
 
     const filename = `${safeFileName(project.name ?? 'project')}-full.csv`;
     sendCsv(res, filename, body);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Budget management — rolling window per user
+// ---------------------------------------------------------------------------
+
+// GET /api/admin/users — per-user 30-day spend + last reset.
+adminRouter.get('/users', async (_req, res, next) => {
+  try {
+    // Distinct user_ids from projects (only users who've created a project).
+    const { data: projects, error: projErr } = await supabaseAdmin
+      .from('projects')
+      .select('user_id');
+    if (projErr) throw projErr;
+
+    const userIds = Array.from(
+      new Set((projects ?? []).map((p) => p.user_id).filter(Boolean))
+    );
+    if (userIds.length === 0) {
+      return res.json({ users: [], cap_usd: env.budgetCapUsd });
+    }
+
+    // Most recent reset per user.
+    const { data: resets } = await supabaseAdmin
+      .from('budget_resets')
+      .select('user_id, reset_at')
+      .in('user_id', userIds)
+      .order('reset_at', { ascending: false });
+
+    const lastResetByUser = new Map<string, string>();
+    for (const r of resets ?? []) {
+      if (!lastResetByUser.has(r.user_id)) lastResetByUser.set(r.user_id, r.reset_at);
+    }
+
+    // Usage rows in the last 30 days (outer bound; per-user window trimmed below).
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: usage } = await supabaseAdmin
+      .from('claude_usage')
+      .select('user_id, cost_usd, created_at')
+      .in('user_id', userIds)
+      .gte('created_at', thirtyDaysAgo);
+
+    // Per-user window spend: only rows after GREATEST(30d ago, last reset).
+    const spentByUser = new Map<string, number>();
+    for (const row of usage ?? []) {
+      const lastReset = lastResetByUser.get(row.user_id) ?? null;
+      if (lastReset && row.created_at <= lastReset) continue;
+      spentByUser.set(
+        row.user_id,
+        (spentByUser.get(row.user_id) ?? 0) + Number(row.cost_usd ?? 0)
+      );
+    }
+
+    // Resolve emails.
+    const emailByUser = new Map<string, string | null>();
+    for (const uid of userIds) {
+      try {
+        const { data } = await supabaseAdmin.auth.admin.getUserById(uid);
+        emailByUser.set(uid, data.user?.email ?? null);
+      } catch {
+        emailByUser.set(uid, null);
+      }
+    }
+
+    const users = userIds.map((uid) => ({
+      user_id: uid,
+      email: emailByUser.get(uid) ?? null,
+      window_spent_usd: Number((spentByUser.get(uid) ?? 0).toFixed(4)),
+      last_reset_at: lastResetByUser.get(uid) ?? null,
+    }));
+
+    res.json({ users, cap_usd: env.budgetCapUsd });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/users/:id/budget-reset — insert a reset row for the user.
+adminRouter.post('/users/:id/budget-reset', async (req, res, next) => {
+  try {
+    const userId = req.params.id!;
+    const reason =
+      typeof req.body?.reason === 'string' ? req.body.reason.trim() || null : null;
+
+    const { error } = await supabaseAdmin.from('budget_resets').insert({
+      user_id: userId,
+      reason,
+      created_by: 'admin',
+    });
+    if (error) throw error;
+
+    res.json({ ok: true, user_id: userId });
   } catch (err) {
     next(err);
   }
