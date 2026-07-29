@@ -167,6 +167,14 @@ niet letterlijk noemde:
 Voorbeeld: "Ik gebruik kleuren van een vakmerk met goede ingrediënten" (uit het
 interview) mag je herhalen. "Geen scherpe geur" of "huidvriendelijk" — die de
 ondernemer niet noemde — mag je NIET afleiden en als claim opnemen.
+
+### Werkwoordstijd — lopend bedrijf altijd tegenwoordige tijd
+Alles wat het bedrijf NU doet of aanbiedt staat in de TEGENWOORDIGE TIJD:
+- WEL: "ik run Soulstyle Studio", "ik help klanten", "ik bied aan huis behandelingen"
+- NIET: "ik runde Soulstyle Studio", "ik hielp klanten", "ik bood behandelingen"
+  (klinkt als een gestopt bedrijf)
+Verleden tijd is ALLEEN toegestaan voor expliciete historische context:
+"In 2018 begon ik...", "Voordat ik startte...", "Destijds werkte ik bij..."
 `.trim();
 }
 
@@ -246,16 +254,17 @@ kennen. Vertaal NOOIT een vakterm naar een Nederlands synoniem:
 Gebruik de term zoals de ondernemer hem in het interview gebruikte.
 
 ## ÉÉN VERTELPERSPECTIEF — HELE WEBSITE
-Kies één vertelperspectief en houd dat overal vol. Voor een eenpersoonsbedrijf
-met je-aanspreekvorm: IK-VORM. De ondernemer spreekt zelf, op elke pagina:
-- "Stuur me een berichtje" (niet "Stuur [naam] een berichtje")
-- "Ik reageer zo snel mogelijk" (niet "Ze reageert zo snel mogelijk")
-- "Plan een afspraak bij mij" (niet "bij haar")
-UITZONDERING: de Over-pagina MAG als enige in de derde persoon verteld worden.
-Maar dan MOET de bijbehorende home-sectie consistent zijn:
-- Over-pagina in derde persoon: home-CTA = "Lees het verhaal van [naam]"
-- Over-pagina in eerste persoon: home-CTA = "Lees mijn verhaal"
-Sectie-titel en CTA van dezelfde sectie mogen NOOIT van perspectief verschillen.
+Kies EEN vertelperspectief en pas dat toe in ALLES: sectietitels, CTA's én
+bodyteksten, op ALLE pagina's. Standaard voor eenmanszaken: IK-VORM.
+
+In ik-vorm:
+- Sectietitel: "Over mij" (NIET "Over [naam]")
+- CTA: "Lees mijn verhaal" (NIET "Leer Rachel kennen")
+- Body: "Ik run...", "Ik help...", "Ik kom naar je toe"
+- VERBODEN: "Ze reageert", "Rachel doet", "bij haar" in bodytekst
+
+"Over Rachel" als sectietitel terwijl de bodytekst "ik run..." zegt = FOUT.
+Sectietitel en CTA van dezelfde sectie mogen NOOIT van perspectief verschillen.
 
 ## "GEEN X, GEEN Y" — MAXIMAAL VIER KEER
 Het patroon "geen X, geen Y" is krachtig maar verliest zijn werking bij herhaling.

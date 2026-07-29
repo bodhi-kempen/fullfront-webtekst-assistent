@@ -48,6 +48,10 @@ const VERBOSE = process.env.VERBOSE === '1';
 const REUSE_PROJECT_ID = process.env.PROJECT_ID ?? '';
 const REUSE_USER_ID = process.env.USER_ID ?? '';
 
+// Populated in main() before checks run; used by checkVakjargonNietVertaald
+// to exempt words the entrepreneur used in their own interview answers.
+let _interviewAnswerText = '';
+
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) {
   console.error('Missing Supabase env. Run from backend/ with .env present.');
   process.exit(1);
@@ -897,18 +901,20 @@ function checkVakjargonNietVertaald(c: Content): CheckResult {
   const VERBODEN_VERTALINGEN = ['hoogtepunten', 'veegtechniek'];
   const hits: string[] = [];
   for (const f of allFieldValues(c)) {
-    const v = stripPlaceholders(f.value).toLowerCase();
+    const v = stripPlaceholders(f.value ?? '').toLowerCase();
     for (const term of VERBODEN_VERTALINGEN) {
-      if (new RegExp(`\\b${term}\\b`).test(v)) {
-        hits.push(`"${term}" in ${f.page}/${f.section}/${f.field}`);
-      }
+      if (!new RegExp(`\\b${term}\\b`).test(v)) continue;
+      // If the entrepreneur used this word in their own interview, it's not
+      // an AI translation of jargon — it's the entrepreneur's vocabulary.
+      if (new RegExp(`\\b${term}\\b`).test(_interviewAnswerText)) continue;
+      hits.push(`"${term}" in ${f.page}/${f.section}/${f.field}`);
     }
   }
   return {
     name: 'vakjargon_niet_vertaald',
     passed: hits.length === 0,
     detail: hits.slice(0, 3).join(' | ') || undefined,
-    severity: 'hard',
+    severity: 'warning',
   };
 }
 
@@ -1021,29 +1027,41 @@ function checkHeroTitelNatuurlijk(c: Content): CheckResult {
 
 function checkVertelperspectiefConsistent(c: Content): CheckResult {
   const problems: string[] = [];
-  const overPg = overPage(c);
-  // "Ze reageert" / "Zij werkt" etc. in first-person contexts outside the Over page
+  // "Ze reageert" / "Zij werkt" etc. — third-person conjugated verbs in
+  // sections where first-person is expected.
   const thirdPersonVerb =
     /\b(ze|zij)\s+(reageert|neemt|stuurt|werkt|doet|heeft|biedt|helpt|ziet|rijdt|plant|bevestigt|mailt|is\s+er)\b/i;
 
+  // Detect whether the site uses first-person voice by checking hero subtitle.
+  const home = homePage(c);
+  const hero = home?.sections.find((s) => s.section_type === 'hero');
+  const heroSubtitle = hero?.fields.find((f) => f.field_name === 'subtitle' || f.field_name === 'body')?.field_value ?? '';
+  const siteIsFirstPerson = /\bik\b/i.test(heroSubtitle);
+
   for (const p of c.pages) {
-    if (overPg && p.id === overPg.id) continue;
     for (const s of p.sections) {
+      // Ervaringen/testimonials: third person is normal in customer quotes.
+      if (s.section_type === 'ervaringen' || s.section_type === 'testimonials') continue;
+
       for (const f of s.fields) {
-        if (!['confirmation_message', 'intro', 'title', 'subtitle', 'form_trigger'].includes(f.field_name)) continue;
-        if (thirdPersonVerb.test(stripPlaceholders(f.value ?? ''))) {
-          problems.push(`${p.slug || 'home'}/${s.section_type}/${f.field_name}: derde persoon buiten Over-pagina`);
+        if (!['confirmation_message', 'intro', 'title', 'subtitle', 'cta_text', 'body'].includes(f.field_name)) continue;
+        const text = stripPlaceholders(f.value ?? '');
+        if (!text) continue;
+        if (thirdPersonVerb.test(text)) {
+          problems.push(`${p.slug || 'home'}/${s.section_type}/${f.field_name}: derde persoon werkwoord`);
         }
       }
     }
   }
 
-  // Also flag perspective clash inside the home Over-sectie (title vs CTA)
-  const home = homePage(c);
+  // Home Over-sectie: title vs CTA perspective clash.
+  // Includes 'over_mij' which is the actual section_type used in content.ts.
   if (home) {
-    const overSec = home.sections.find((s) => s.section_type === 'over' || s.section_type === 'over_short');
+    const overSec = home.sections.find((s) =>
+      ['over', 'over_short', 'over_mij'].includes(s.section_type)
+    );
     if (overSec) {
-      const byName = Object.fromEntries(overSec.fields.map((f) => [f.field_name, f.field_value]));
+      const byName = Object.fromEntries(overSec.fields.map((f) => [f.field_name, f.field_value ?? '']));
       const title = byName['title'] ?? '';
       const cta = byName['cta_text'] ?? '';
       const titleIsThirdPerson = /\bover\s+[A-ZÀ-Ÿ][a-zà-ÿ]+\b/i.test(title);
@@ -1054,6 +1072,10 @@ function checkVertelperspectiefConsistent(c: Content): CheckResult {
       } else if (!titleIsThirdPerson && ctaIsThirdPerson) {
         problems.push(`Home/over: titel eerste persoon ("${title}") maar CTA derde persoon ("${cta}")`);
       }
+      // Cross-page: "Over Rachel" title while the rest of the site uses ik-vorm.
+      if (siteIsFirstPerson && titleIsThirdPerson) {
+        problems.push(`Home/over: site is ik-vorm maar sectietitel is derde persoon ("${title}")`);
+      }
     }
   }
 
@@ -1061,25 +1083,82 @@ function checkVertelperspectiefConsistent(c: Content): CheckResult {
     name: 'vertelperspectief_consistent',
     passed: problems.length === 0,
     detail: problems.slice(0, 3).join(' | ') || undefined,
-    severity: 'warning',
+    severity: 'hard',
   };
 }
 
-// ---- Warnings ----
+// ---- Hard checks (dt spelling + perspective) ----
 
 function checkSpellingDt(c: Content): CheckResult {
+  // Common verb stems. For each: detect missing -t after hij/zij subjects
+  // (Pattern A) and wrongly-added -t after "ik" (Pattern B).
+  const DT_VERB_STEMS = [
+    'luister', 'plan', 'vind', 'antwoord', 'help', 'werk', 'maak', 'zorg',
+    'bied', 'denk', 'voel', 'zoek', 'kies', 'regel', 'stuur', 'lever',
+    'begeleid', 'adviseer', 'bel', 'mail', 'geef', 'neem', 'leg', 'schrijf',
+    'lees', 'bespreek', 'betaal', 'behandel', 'ondersteun', 'ontvang',
+    'begrijp', 'kijk', 'blijf', 'verdien', 'volg', 'vraag', 'hoor', 'boek',
+    'gebruik', 'koop', 'vertel', 'beantwoord', 'overleg', 'reken', 'breng',
+    'knip', 'verander', 'begin', 'word',
+  ];
+  // Subjects narrow-listed to avoid false positives ("die dag", "die klant").
+  const SUBJ3 = '(?:hij|zij|ze|iemand\\s+die|iedereen\\s+die|wie)';
+  // Optional adverb cluster between subject and verb (max 2).
+  // Includes "echt" / "heel" / "erg" / "wel" / "zeker" which commonly appear
+  // between "iemand die" and the verb: "iemand die echt luister naar je".
+  const ADV = '(?:\\s+(?:ook|dan|nu|al|zelfs|gewoon|altijd|soms|vaak|nog|direct|meteen|echt|heel|erg|wel|zeker|eigenlijk|gewoon|juist)){0,2}';
+
   const suspects: string[] = [];
   for (const f of allFieldValues(c)) {
-    const v = f.value;
-    if (/\bpland\b/i.test(v)) suspects.push(`"pland" in ${f.page}/${f.section}/${f.field}`);
-    if (/\bword\.\s/i.test(v)) suspects.push(`"word." (likely "wordt.") in ${f.page}/${f.section}/${f.field}`);
-    if (/\bvind\.\s/i.test(v)) suspects.push(`"vind." (likely "vindt.") in ${f.page}/${f.section}/${f.field}`);
-    if (/\bgebeurd\s+er\b/i.test(v)) suspects.push(`"gebeurd er" (likely "gebeurt er") in ${f.page}/${f.section}/${f.field}`);
+    const v = stripPlaceholders(f.value ?? '');
+    const loc = `${f.page}/${f.section}/${f.field}`;
+    for (const stem of DT_VERB_STEMS) {
+      // Pattern A: hij/zij/ze + [adv] + stem (missing -t)
+      if (new RegExp(`\\b${SUBJ3}${ADV}\\s+${stem}(?!t|\\w)`, 'i').test(v)) {
+        suspects.push(`"${stem}" mist -t na hij/zij in ${loc}`);
+        break;
+      }
+      // Pattern B: ik + [adv] + stem + t (wrongly-added -t)
+      if (new RegExp(`\\bik${ADV}\\s+${stem}t(?!\\w)`, 'i').test(v)) {
+        suspects.push(`"ik ${stem}t" (moet zonder -t) in ${loc}`);
+        break;
+      }
+    }
+    // Legacy patterns not covered by stem list
+    if (/\bpland\b/i.test(v)) suspects.push(`"pland" in ${loc}`);
+    if (/\bgebeurd\s+er\b/i.test(v)) suspects.push(`"gebeurd er" (moet "gebeurt er") in ${loc}`);
   }
   return {
     name: 'spelling_dt',
     passed: suspects.length === 0,
     detail: suspects.slice(0, 5).join(' | ') || undefined,
+    severity: 'hard',
+  };
+}
+
+function checkWerkwoordstijdBedrijf(c: Content): CheckResult {
+  // Detects past-tense "ik runde / ik hielp / ik bood" for a currently
+  // running business — sounds like the business has closed. Only fires when
+  // there is no historical-context marker in the same sentence.
+  const PAST_TENSE = /\bik\s+(runde|hielp|bood|werkte|deed|maakte|zorgde|begeleidde|adviseerde)\b/i;
+  const HISTORICAL = /\b(begon|startte|voordat|destijds|vroeger|\d{4}|jaar\s+geleden|ooit)\b/i;
+  const problems: string[] = [];
+
+  for (const f of allFieldValues(c)) {
+    const text = stripPlaceholders(f.value ?? '');
+    if (!PAST_TENSE.test(text)) continue;
+    // Check sentence-by-sentence so a historical intro doesn't mask later errors.
+    const sentences = text.split(/(?<=[.!?])\s+/);
+    for (const sent of sentences) {
+      if (!PAST_TENSE.test(sent)) continue;
+      if (HISTORICAL.test(sent)) continue;
+      problems.push(`${f.page}/${f.section}/${f.field}: "${sent.slice(0, 100)}"`);
+    }
+  }
+  return {
+    name: 'werkwoordstijd_bedrijf',
+    passed: problems.length === 0,
+    detail: problems.slice(0, 3).join(' | ') || undefined,
     severity: 'warning',
   };
 }
@@ -1181,9 +1260,9 @@ function checkPrijsnotatieConsistent(c: Content): CheckResult {
 }
 
 const CHECKS: Check[] = [
+  // ── HARD (18) ────────────────────────────────────────────────
   // Fabrication prevention
   checkNoForbiddenWords,
-  checkVakjargonNietVertaald,
   checkNameCorrect,
   checkNoFabricatedFaq,
   checkWebshopNotFact,
@@ -1202,8 +1281,11 @@ const CHECKS: Check[] = [
   checkNoDeadLinks,
   checkCtaMatchesDestination,
   checkOverPageLength,
-  // Warnings
+  // Taal & perspectief
   checkSpellingDt,
+  checkVertelperspectiefConsistent,
+  // ── WARNINGS (10) ────────────────────────────────────────────
+  checkVakjargonNietVertaald,
   checkConcreteDetail,
   checkTargetGroupsCovered,
   checkIntroLength,
@@ -1212,7 +1294,7 @@ const CHECKS: Check[] = [
   checkGeenTicBegrensd,
   checkDetailNietOvergebruikt,
   checkHeroTitelNatuurlijk,
-  checkVertelperspectiefConsistent,
+  checkWerkwoordstijdBedrijf,
 ];
 
 // ---------------------------------------------------------------------------
@@ -1262,6 +1344,20 @@ async function main(): Promise<void> {
       userId = r.userId;
       projectId = r.projectId;
       content = r.content;
+    }
+
+    // Populate interview answer text for vakjargon exemption check.
+    try {
+      const { data } = await admin
+        .from('interview_answers')
+        .select('answer_text')
+        .eq('project_id', projectId);
+      _interviewAnswerText = ((data ?? []) as { answer_text: string }[])
+        .map((a) => a.answer_text)
+        .join('\n')
+        .toLowerCase();
+    } catch {
+      // Non-fatal — check degrades to no-exemption mode.
     }
   } catch (err) {
     if (err instanceof InfraError) {
