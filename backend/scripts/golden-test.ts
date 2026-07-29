@@ -507,18 +507,29 @@ function checkNoForbiddenWords(c: Content): CheckResult {
 }
 
 const KNOWN_HALLUCINATED_NAMES = ['Sophie', 'Natasja', 'Eva', 'Marieke', 'Sandra', 'Lisa'];
+
+// Strip patterns that are not visible copy: email addresses and URLs.
+// A name in "rachel@soulstyle.nl" or "https://…/rachel" is infrastructure,
+// not a self-introduction in body text.
+function visibleCopy(s: string): string {
+  return s
+    .replace(/\S+@\S+\.\S+/g, '')    // email addresses
+    .replace(/https?:\/\/\S+/g, '')   // full URLs
+    .replace(/\[INVULLEN:[^\]]*\]/gi, '');
+}
+
 function checkNameCorrect(c: Content): CheckResult {
   let rachelFound = false;
   const badHits: string[] = [];
   for (const f of allFieldValues(c)) {
-    const s = stripPlaceholders(f.value);
-    if (/\bRachel\b/.test(s)) rachelFound = true;
+    const visible = visibleCopy(f.value ?? '');
+    if (/\bRachel\b/.test(visible)) rachelFound = true;
     for (const n of KNOWN_HALLUCINATED_NAMES) {
-      if (new RegExp(`\\b${n}\\b`).test(s)) badHits.push(`"${n}" in ${f.page}/${f.section}/${f.field}`);
+      if (new RegExp(`\\b${n}\\b`).test(visible)) badHits.push(`"${n}" in ${f.page}/${f.section}/${f.field}`);
     }
   }
   const problems: string[] = [];
-  if (!rachelFound) problems.push('"Rachel" niet gevonden');
+  if (!rachelFound) problems.push('"Rachel" niet gevonden in zichtbare copy (e-mail/URL telt niet)');
   if (badHits.length) problems.push('verzonnen: ' + badHits.slice(0, 5).join('; '));
   return {
     name: 'naam_correct',
@@ -1064,7 +1075,12 @@ function checkVertelperspectiefConsistent(c: Content): CheckResult {
       const byName = Object.fromEntries(overSec.fields.map((f) => [f.field_name, f.field_value ?? '']));
       const title = byName['title'] ?? '';
       const cta = byName['cta_text'] ?? '';
-      const titleIsThirdPerson = /\bover\s+[A-ZÀ-Ÿ][a-zà-ÿ]+\b/i.test(title);
+      // Whitelist: "Over mij" / "Over ons" are always first-person, regardless of casing.
+      // Regex intentionally has NO 'i' flag: [A-ZÀ-Ÿ] must be an actual capital letter
+      // (eigennaam) to count as third-person — prevents "mij" from falsely triggering.
+      const FIRST_PERSON_OVER = /^over\s+(?:mij|ons)\s*$/i;
+      const titleIsThirdPerson = !FIRST_PERSON_OVER.test(title) &&
+        /\bover\s+[A-ZÀ-Ÿ][a-zà-ÿ]+\b/.test(title);
       const ctaIsFirstPerson = /\bmijn\b/i.test(cta);
       const ctaIsThirdPerson = /\bvan\s+[A-ZÀ-Ÿ][a-zà-ÿ]+\b/i.test(cta) || /\bhaar\s+verhaal\b/i.test(cta);
       if (titleIsThirdPerson && ctaIsFirstPerson) {

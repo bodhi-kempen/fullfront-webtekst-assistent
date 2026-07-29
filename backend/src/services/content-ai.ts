@@ -139,6 +139,14 @@ Als de naam van de ondernemer niet bekend is, gebruik dan de bedrijfsnaam
 ("${businessName}") of een neutrale formulering ("een afspraak bij ${businessName}",
 "het team van ${businessName}"). LIEVER GEEN NAAM dan een verzonnen naam.
 
+### Naam-introductie (WEL DOEN)
+Introduceer de eigenaar precies ÉÉN keer met naam in de zichtbare copy, op de
+meest natuurlijke plek: de body van de over_mij-sectie (homepage) of de eerste
+alinea van de Over-pagina. Gebruik een zelfintroductie in ik-vorm:
+  "Ik ben Rachel, en ik ..."   of   "Mijn naam is Rachel."
+Dit is GEEN derde-persoon — het is ik-vorm met eigen naam. Als de naam van de
+eigenaar niet in het interview staat, gebruik dan [INVULLEN: naam] op die plek.
+
 ### Zekerheid behouden
 Behoud de mate van zekerheid uit het interview. Als de ondernemer
 "misschien", "ik denk", "ik ben aan het onderzoeken", "ik ben ermee bezig"
