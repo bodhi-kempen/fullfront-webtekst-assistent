@@ -14,7 +14,8 @@
  *   API_URL=https://webtekst.fullfront.nl npx tsx scripts/golden-test.ts
  *
  * Optional:
- *   KEEP=1              Leave the throw-away user + project intact for inspection.
+ *   CLEANUP=1           Delete the test user + project after the run (cascade).
+ *                       Default: project is always kept for inspection.
  *   VERBOSE=1           Print per-turn interview progress + full page dump.
  *
  * Exit codes:
@@ -40,10 +41,10 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const API_URL = process.env.API_URL ?? 'http://localhost:4000';
-const KEEP = process.env.KEEP === '1';
+const CLEANUP = process.env.CLEANUP === '1';
 const VERBOSE = process.env.VERBOSE === '1';
 // PROJECT_ID + USER_ID lets you re-run just the checks against an existing
-// KEEP=1 project — skip the whole interview + content-gen cycle. Useful for
+// project — skip the whole interview + content-gen cycle. Useful for
 // iterating on check logic without burning a fresh $1.70 per iteration.
 const REUSE_PROJECT_ID = process.env.PROJECT_ID ?? '';
 const REUSE_USER_ID = process.env.USER_ID ?? '';
@@ -1330,7 +1331,7 @@ async function main(): Promise<void> {
   try {
     if (REUSE_PROJECT_ID) {
       // Iteration mode: skip interview + content gen, just re-run checks
-      // against a KEEP=1 project from an earlier run.
+      // against an existing project from an earlier run.
       console.log(`  Reuse mode: fetching content from existing project ${REUSE_PROJECT_ID}`);
       // Sign in as the owning user (requires their id — we can't recover the
       // original password). Cheapest path: generate a magic-link-style token
@@ -1430,17 +1431,17 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  if (KEEP) {
-    console.log(`  KEEP=1 — leaving test user + project intact.`);
-    console.log(`  user id:    ${userId}`);
-    console.log(`  project id: ${projectId}`);
-  } else if (userId) {
+  if (CLEANUP && userId) {
     try {
       await admin.auth.admin.deleteUser(userId);
-      console.log(`  Cleaned up test user ${userId} (cascade deletes project).`);
+      console.log(`  Opgeruimd: test-user ${userId} verwijderd (cascade verwijdert project).`);
     } catch (err) {
-      console.warn(`  ⚠ cleanup failed: ${err instanceof Error ? err.message : err}`);
+      console.warn(`  ⚠ cleanup mislukt: ${err instanceof Error ? err.message : err}`);
     }
+  } else if (userId) {
+    console.log(`  Project blijft staan: ${projectId}`);
+    console.log(`  user id:    ${userId}`);
+    console.log(`  Zet CLEANUP=1 om automatisch op te ruimen.`);
   }
 
   process.exit(hardFails.length > 0 ? 1 : 0);
